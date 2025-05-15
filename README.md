@@ -9,11 +9,10 @@ Our rendering engine is now available as an [NPM package](https://www.npmjs.com/
 ## 🚀 Getting Started
 
 1. Install dependencies
+
    ```bash
    npm install
    ```
-
-
 2. Run development server
 
    ```bash
@@ -78,10 +77,9 @@ copy
 
 ---
 
-
 ## 📜 License
 
-This project is licensed under the MIT License - see [LICENSE](https://aistudio.alibaba-inc.com/LICENSE) for details
+This project is licensed under the MIT License.
 
 ---
 
