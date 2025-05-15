@@ -1,6 +1,6 @@
-# LAM\_Render 🎨
+# LAM\_WebRender 🎨
 
-**Lightweight WebGL Renderer** - Real-time 3D Gaussian Splatting for LAM and LAM\_Audio2Expression.
+**Lightweight WebGL Renderer** - Real-time 3D Gaussian Splatting Render Engine for LAM and LAM\_Audio2Expression.
 
 Our rendering engine is now available as an [NPM package](https://www.npmjs.com/package/gaussian-splat-renderer-for-lam).
 
@@ -53,7 +53,7 @@ npm install gaussian-splat-renderer-for-lam
 > 💡 **Advanced Features**
 >
 > * Facial animations: Load `/asset/test_expression_1s.json` for expression control
-> * Custom avatars: Generate new models via [LAM](https://github.com/yourname/LAM) and replace ZIP files
+> * Custom avatars: Generate new models via [LAM](https://github.com/aigc3d/LAM.git) and replace ZIP files
 
 ---
 
@@ -62,28 +62,21 @@ npm install gaussian-splat-renderer-for-lam
 copy
 
 
-| Feature               | Repository                                                                |
-| --------------------- | ------------------------------------------------------------------------- |
-| Chat integration      | [OpenAvatarChat](https://openavatarchat.example/)                         |
-| Avatar generation     | [LAM](https://github.com/yourname/LAM)                                    |
-| Expression generation | [LAM\_Audio2Expression](https://github.com/yourname/LAM_Audio2Expression) |
+| Feature               | Repository                                                                    |
+| --------------------- | ----------------------------------------------------------------------------- |
+| Chat integration      | [OpenAvatarChat](https://github.com/HumanAIGC-Engineering/OpenAvatarChat.git) |
+| Avatar generation     | [LAM](https://github.com/aigc3d/LAM.git)                                      |
+| Expression generation | [LAM\_Audio2Expression](https://github.com/aigc3d/LAM_Audio2Expression.git)   |
 
 ---
 
 ## 🧪 Example Files
 
-* Avatar model: `/asset/arkit/p2-1.zip`
-* Expression data: `/asset/test_expression_1s.json`
+* Avatar model: `./asset/arkit/p2-1.zip`
+* Expression data: `./asset/test_expression_1s.json`
 
 ---
 
 ## 📜 License
 
 This project is licensed under the MIT License.
-
----
-
-## 📨 Contact
-
-* Project page: [GitHub](https://github.com/aigc3d/LAM_WebRender.git)
-* Email: [your.email@example.com](mailto:doris.yxd@alibaba-inc.com)
