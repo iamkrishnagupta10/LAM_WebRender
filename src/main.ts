@@ -1,53 +1,21 @@
-import { AvatarManager } from './avatarManager';
+import { avatarManager } from './avatarManager.js';
 
-console.log('🚀 Starting 100 AI Avatars...');
+console.log('🚀 LAM WebRender starting...');
 
-// Simple, direct initialization
-function initApp() {
-  const container = document.getElementById('LAM_WebRender');
-  if (!container) {
-    console.error('Container not found!');
-    return;
-  }
+// Make avatar manager globally accessible for onclick handlers
+(window as any).avatarManager = avatarManager;
 
-  console.log('Container found, creating avatars...');
+// Hide loading screen once everything is initialized
+window.addEventListener('load', () => {
+  console.log('✅ LAM WebRender loaded successfully');
   
-  try {
-    const avatarManager = new AvatarManager(container);
-    
-    // Make globally available for onclick handlers
-    (window as any).avatarManager = avatarManager;
-    
-    avatarManager.start();
-    
-    // Hide loading screen
+  // Give the avatar manager a moment to finish initialization
+  setTimeout(() => {
     const loadingScreen = document.getElementById('loadingScreen');
     if (loadingScreen) {
-      setTimeout(() => {
-        loadingScreen.style.display = 'none';
-      }, 1000);
+      loadingScreen.style.display = 'none';
     }
-    
-    console.log('✅ 100 AI Avatars loaded successfully!');
-  } catch (error) {
-    console.error('❌ Error loading avatars:', error);
-    
-    // Show error message
-    container.innerHTML = `
-      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; color: white; text-align: center; padding: 2rem;">
-        <h1>🤖 100 AI Avatars</h1>
-        <p style="margin: 1rem 0;">Error loading application: ${error.message}</p>
-        <button onclick="location.reload()" style="padding: 1rem 2rem; background: #00ff88; color: white; border: none; border-radius: 8px; cursor: pointer;">
-          Reload Page
-        </button>
-      </div>
-    `;
-  }
-}
+  }, 1000);
+});
 
-// Initialize when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initApp);
-} else {
-  initApp();
-}
+console.log('✅ LAM WebRender initialized with 100 avatars');

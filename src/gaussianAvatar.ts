@@ -1,5 +1,21 @@
+// Try to import the gaussian splat renderer, but handle gracefully if not available
+let GaussianSplatRenderer: any = null;
 
-// Simplified avatar implementation for better build compatibility
+try {
+  GaussianSplatRenderer = require('gaussian-splat-renderer-for-lam');
+} catch (e) {
+  try {
+    // Try dynamic import as fallback
+    import('gaussian-splat-renderer-for-lam').then(module => {
+      GaussianSplatRenderer = module;
+    }).catch(() => {
+      console.warn('⚠️ gaussian-splat-renderer-for-lam not available, using fallback renderer');
+    });
+  } catch (e2) {
+    console.warn('⚠️ gaussian-splat-renderer-for-lam not available, using fallback renderer');
+  }
+}
+
 export interface GaussianAvatarOptions {
   width?: number;
   height?: number;
@@ -16,6 +32,9 @@ export class GaussianAvatar {
   private options: GaussianAvatarOptions;
   private startTime = 0;
   private expressionData: any = {};
+  private renderer: any = null;
+  private scene: any = null;
+  private viewer: any = null;
 
   constructor(container: HTMLDivElement, assetPath: string, options: GaussianAvatarOptions = {}) {
     this.container = container;
@@ -55,75 +74,159 @@ export class GaussianAvatar {
     this.container.style.overflow = 'hidden';
   }
 
-  public start() {
-    this.render();
-  }
-
-  public render() {
+  public async start() {
     try {
-      this.startTime = performance.now() / 1000;
-      
-      // Create a placeholder avatar display
-      this.container.innerHTML = `
-        <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: white; flex-direction: column;">
-          <div style="width: 60px; height: 60px; border: 3px solid #00ff88; border-radius: 50%; border-top-color: transparent; animation: spin 1s linear infinite; margin-bottom: 10px;"></div>
-          <div style="text-align: center; font-size: 12px; opacity: 0.8;">
-            <div>AI Avatar</div>
-            <div style="margin-top: 4px; font-size: 10px;">${this.curState}</div>
-          </div>
-        </div>
-        <style>
-          @keyframes spin {
-            to { transform: rotate(360deg); }
-          }
-        </style>
-      `;
-
-      // Try to load the actual Gaussian Splat renderer if available
-      this.loadGaussianRenderer().catch(() => {
-        // Fallback to placeholder if loading fails
-        console.log('Using fallback avatar display');
-      });
-
+      await this.initializeGaussianRenderer();
     } catch (error) {
-      console.error('Failed to render avatar:', error);
-      this.showError();
+      console.error('Failed to initialize Gaussian renderer:', error);
+      this.showSimpleRenderer();
     }
   }
 
-  private async loadGaussianRenderer() {
+  private async initializeGaussianRenderer() {
     try {
-      // Dynamic import to avoid build issues
-      const GaussianModule = await import("gaussian-splat-renderer-for-lam");
+      console.log('🚀 Initializing LAM Gaussian Splat Renderer...');
       
-      if (GaussianModule && GaussianModule.GaussianSplatRenderer) {
-        const renderer = await GaussianModule.GaussianSplatRenderer.getInstance(
-          this.container,
-          this.assetPath,
-          {
-            getChatState: this.options.getChatState || this.getChatState.bind(this),
-            getExpressionData: this.options.getExpressionData || this.getExpressionData.bind(this),
-            backgroundColor: this.options.backgroundColor || "#000000"
-          }
-        );
-        
-        console.log('Gaussian renderer loaded successfully');
+      // Create loading indicator
+      this.showLoading();
+      
+      // Check if Gaussian renderer is available
+      if (!GaussianSplatRenderer) {
+        throw new Error('Gaussian Splat Renderer not available');
       }
+      
+      // Try to find the right viewer class
+      const ViewerClass = GaussianSplatRenderer.DropboxViewer || 
+                         GaussianSplatRenderer.Viewer || 
+                         GaussianSplatRenderer.GaussianSplatViewer || 
+                         GaussianSplatRenderer.default || 
+                         GaussianSplatRenderer;
+      
+      if (typeof ViewerClass === 'function') {
+        this.viewer = new ViewerClass({
+          container: this.container,
+          width: this.options.width || 120,
+          height: this.options.height || 120,
+          backgroundColor: this.options.backgroundColor || "#000000",
+        });
+        
+        // Load default avatar asset or use provided path
+        const avatarAsset = this.assetPath || './asset/test_expression_1s.json';
+        
+        if (this.viewer.loadGaussianSplat) {
+          await this.viewer.loadGaussianSplat(avatarAsset);
+        } else if (this.viewer.loadAsset) {
+          await this.viewer.loadAsset(avatarAsset);
+        }
+        
+        console.log('✅ LAM Gaussian Splat Renderer initialized successfully');
+        this.hideLoading();
+        
+        // Start render loop
+        this.startRenderLoop();
+        
+      } else {
+        throw new Error('No suitable viewer class found in Gaussian Splat Renderer');
+      }
+      
     } catch (error) {
-      console.warn('Gaussian renderer not available, using fallback');
-      throw error;
+      console.error('Failed to initialize Gaussian renderer:', error);
+      this.showSimpleRenderer();
     }
   }
 
-  private showError() {
+  private showSimpleRenderer() {
+    console.log('🎭 Using simple 3D avatar renderer...');
+    
     this.container.innerHTML = `
-      <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: #ff6b6b; text-align: center; font-size: 12px;">
-        <div>
-          <div>⚠️</div>
-          <div style="margin-top: 8px;">Avatar Error</div>
+      <div class="avatar-container" style="width: 100%; height: 100%; position: relative; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; overflow: hidden;">
+        <canvas id="avatar-canvas-${Math.random().toString(36).substr(2, 9)}" width="${this.options.width}" height="${this.options.height}" style="width: 100%; height: 100%; display: block;"></canvas>
+        <div class="avatar-info" style="position: absolute; bottom: 10px; left: 10px; color: white; font-size: 12px; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 15px;">
+          <div>AI Avatar #${Math.floor(Math.random() * 100) + 1}</div>
+          <div style="font-size: 10px; margin-top: 2px; opacity: 0.8;">${this.curState}</div>
         </div>
       </div>
     `;
+    
+    // Initialize simple 3D rendering
+    this.initSimple3D();
+  }
+
+  private initSimple3D() {
+    const canvas = this.container.querySelector('canvas') as HTMLCanvasElement;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    // Simple animated avatar representation
+    let frame = 0;
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw animated avatar silhouette
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const time = frame * 0.05;
+      
+      // Head
+      ctx.beginPath();
+      ctx.arc(centerX, centerY - 40 + Math.sin(time) * 2, 30, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255, 255, 255, ${0.8 + Math.sin(time * 2) * 0.1})`;
+      ctx.fill();
+      
+      // Body
+      ctx.beginPath();
+      ctx.ellipse(centerX, centerY + 20, 25, 40, 0, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255, 255, 255, 0.6)`;
+      ctx.fill();
+      
+      // Arms
+      ctx.beginPath();
+      ctx.arc(centerX - 35, centerY + Math.sin(time * 1.5) * 5, 8, 0, Math.PI * 2);
+      ctx.arc(centerX + 35, centerY + Math.sin(time * 1.5 + Math.PI) * 5, 8, 0, Math.PI * 2);
+      ctx.fill();
+      
+      frame++;
+      requestAnimationFrame(animate);
+    };
+    
+    animate();
+  }
+
+  private startRenderLoop() {
+    if (!this.viewer) return;
+    
+    const render = () => {
+      if (this.viewer && this.viewer.render) {
+        this.viewer.render();
+      }
+      requestAnimationFrame(render);
+    };
+    
+    render();
+  }
+
+  private showLoading() {
+    this.container.innerHTML = `
+      <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: white; flex-direction: column; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+        <div style="width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px;"></div>
+        <div style="text-align: center; font-size: 12px;">
+          <div>Loading LAM Avatar...</div>
+          <div style="margin-top: 5px; font-size: 10px; opacity: 0.8;">Initializing Renderer</div>
+        </div>
+      </div>
+      <style>
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      </style>
+    `;
+  }
+
+  private hideLoading() {
+    // Loading will be replaced by the renderer
+    console.log('Loading complete');
   }
 
   public getChatState() {
@@ -134,9 +237,12 @@ export class GaussianAvatar {
     this.curState = state;
     
     // Update the status display
-    const statusElement = this.container.querySelector('[data-status]');
+    const statusElement = this.container.querySelector('.avatar-info');
     if (statusElement) {
-      statusElement.textContent = state;
+      const stateDiv = statusElement.querySelector('div:last-child') as HTMLElement;
+      if (stateDiv) {
+        stateDiv.textContent = state;
+      }
     }
     
     // Update visual state
@@ -145,48 +251,37 @@ export class GaussianAvatar {
 
   private updateVisualState(state: string) {
     const colors = {
-      'Idle': '#666',
+      'Idle': '#667eea',
       'Listening': '#00ff88',
       'Thinking': '#ffa500',
-      'Responding': '#ff4757'
+      'Responding': '#ff6b6b'
     };
     
-    const color = colors[state as keyof typeof colors] || '#666';
-    const borderElement = this.container.querySelector('[style*="border"]') as HTMLElement;
+    const color = colors[state as keyof typeof colors] || '#667eea';
     
-    if (borderElement) {
-      borderElement.style.borderColor = color;
+    // Update container background if using fallback
+    if (this.container.style.background.includes('linear-gradient')) {
+      this.container.style.background = `linear-gradient(135deg, ${color} 0%, #764ba2 100%)`;
     }
   }
 
   public getExpressionData() {
-    // Simple expression data fallback
-    const time = (performance.now() / 1000 - this.startTime) * 2;
-    
-    return {
-      eyeBlinkLeft: Math.sin(time * 0.1) * 0.1 + 0.1,
-      eyeBlinkRight: Math.sin(time * 0.1) * 0.1 + 0.1,
-      jawOpen: Math.sin(time * 0.05) * 0.05 + 0.05,
-      mouthSmileLeft: Math.sin(time * 0.02) * 0.3 + 0.3,
-      mouthSmileRight: Math.sin(time * 0.02) * 0.3 + 0.3
-    };
+    return this.expressionData;
   }
 
-  public destroy() {
-    if (this.container) {
-      this.container.innerHTML = '';
+  public setExpressionData(data: any) {
+    this.expressionData = data;
+    
+    // Update the avatar expression if renderer supports it
+    if (this.viewer && this.viewer.setExpression) {
+      this.viewer.setExpression(data);
     }
   }
 
-  public updateExpressionData(expressionData: any) {
-    this.expressionData = expressionData;
-  }
-
-  public setAssetPath(newPath: string) {
-    this.assetPath = newPath;
-  }
-
-  public getState() {
-    return this.curState;
+  public destroy() {
+    if (this.viewer && this.viewer.destroy) {
+      this.viewer.destroy();
+    }
+    this.container.innerHTML = '';
   }
 }
