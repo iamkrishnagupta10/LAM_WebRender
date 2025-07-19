@@ -1,5 +1,4 @@
 import { GaussianAvatar } from './gaussianAvatar';
-import { io, Socket } from 'socket.io-client';
 
 export interface AvatarConfig {
   id: number;
@@ -21,7 +20,6 @@ export interface ChatMessage {
 }
 
 export class AvatarManager {
-  private socket: Socket;
   private avatars: Map<string, GaussianAvatar> = new Map();
   private avatarConfigs: AvatarConfig[] = [];
   private selectedAvatarId: number | null = null;
@@ -29,13 +27,42 @@ export class AvatarManager {
   private avatarGrid!: HTMLElement;
   private chatMessages: ChatMessage[] = [];
   
-  constructor(
-    private container: HTMLElement,
-    private serverUrl: string = 'http://localhost:3001'
-  ) {
-    this.socket = io(this.serverUrl);
-    this.setupSocketListeners();
+  constructor(private container: HTMLElement) {
+    this.generateAvatars();
     this.createUI();
+  }
+
+  private generateAvatars() {
+    const personalities = [
+      'friendly', 'professional', 'creative', 'analytical', 'empathetic',
+      'humorous', 'serious', 'optimistic', 'curious', 'supportive'
+    ];
+    
+    const modelTypes = [
+      'nlp_xlmr_named-entity-recognition_viet-ecommerce-title',
+      'nlp_structbert_word-segmentation_chinese-base',
+      'nlp_convbert_text-classification_chinese-base',
+      'nlp_roberta_sentiment-classification_english-base'
+    ];
+    
+    const colors = [
+      '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+      '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9'
+    ];
+
+    this.avatarConfigs = Array.from({ length: 100 }, (_, i) => ({
+      id: i + 1,
+      name: `Avatar_${i + 1}`,
+      personality: personalities[Math.floor(Math.random() * personalities.length)],
+      modelType: modelTypes[Math.floor(Math.random() * modelTypes.length)],
+      assetPath: `./asset/avatar_${(i % 10) + 1}.zip`,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      position: {
+        x: (i % 10) * 120,
+        y: Math.floor(i / 10) * 120,
+        z: 0
+      }
+    }));
   }
 
   private createUI() {
@@ -44,7 +71,7 @@ export class AvatarManager {
         <div class="header">
           <h1>🤖 100 AI Avatars - Live Chat Room</h1>
           <div class="stats">
-            <span id="connectedUsers">Connected Users: 1</span>
+            <span id="connectedUsers">Demo Mode</span>
             <span id="activeAvatars">Active Avatars: 0</span>
           </div>
         </div>
@@ -100,6 +127,7 @@ export class AvatarManager {
     
     this.setupEventListeners();
     this.addStyles();
+    this.renderAvatarGrid();
   }
 
   private setupEventListeners() {
@@ -116,35 +144,9 @@ export class AvatarManager {
     searchInput.addEventListener('input', () => this.filterAvatars());
     personalityFilter.addEventListener('change', () => this.filterAvatars());
 
-    // Voice input (placeholder for future implementation)
     const voiceButton = document.getElementById('voiceButton');
     voiceButton?.addEventListener('click', () => {
-      // TODO: Implement voice input
-      console.log('Voice input not implemented yet');
-    });
-  }
-
-  private setupSocketListeners() {
-    this.socket.on('connect', () => {
-      console.log('Connected to server');
-    });
-
-    this.socket.on('avatarConfigs', (configs: AvatarConfig[]) => {
-      this.avatarConfigs = configs;
-      this.renderAvatarGrid();
-      this.updateStats();
-    });
-
-    this.socket.on('avatarStateUpdate', ({ avatarId, state }: { avatarId: number; state: string }) => {
-      this.updateAvatarState(avatarId, state);
-    });
-
-    this.socket.on('avatarResponse', (response: ChatMessage) => {
-      this.addChatMessage(response);
-    });
-
-    this.socket.on('avatarSelected', (avatar: AvatarConfig) => {
-      this.displaySelectedAvatar(avatar);
+      console.log('Voice input coming soon!');
     });
   }
 
@@ -161,7 +163,7 @@ export class AvatarManager {
         <div class="avatar-preview" style="background: linear-gradient(45deg, ${config.color}, ${config.color}80);">
           <div class="avatar-status idle" id="status-${config.id}"></div>
           <div class="avatar-mini" id="mini-${config.id}">
-            <div class="loading-placeholder">Loading...</div>
+            <div class="avatar-icon">🤖</div>
           </div>
         </div>
         <div class="avatar-info">
@@ -173,33 +175,16 @@ export class AvatarManager {
 
       avatarCard.addEventListener('click', () => this.selectAvatar(config.id));
       this.avatarGrid.appendChild(avatarCard);
-      
-      // Load mini avatar preview
-      this.loadMiniAvatar(config);
     });
-  }
-
-  private loadMiniAvatar(config: AvatarConfig) {
-    const miniContainer = document.getElementById(`mini-${config.id}`);
-    if (miniContainer) {
-      try {
-        // Create a smaller version of the avatar for preview
-        const miniAvatar = new GaussianAvatar(miniContainer as HTMLDivElement, config.assetPath, {
-          width: 80,
-          height: 80,
-          autoStart: true
-        });
-        this.avatars.set(config.id.toString(), miniAvatar);
-      } catch (error) {
-        console.error(`Failed to load mini avatar ${config.id}:`, error);
-        miniContainer.innerHTML = '<div class="error-placeholder">❌</div>';
-      }
-    }
+    
+    this.updateStats();
   }
 
   private selectAvatar(avatarId: number) {
     this.selectedAvatarId = avatarId;
-    this.socket.emit('selectAvatar', avatarId);
+    const avatar = this.avatarConfigs.find(a => a.id === avatarId);
+    
+    if (!avatar) return;
     
     // Update UI
     document.querySelectorAll('.avatar-card').forEach(card => {
@@ -218,6 +203,8 @@ export class AvatarManager {
     sendButton.disabled = false;
     voiceButton.disabled = false;
     messageInput.focus();
+    
+    this.displaySelectedAvatar(avatar);
   }
 
   private displaySelectedAvatar(avatar: AvatarConfig) {
@@ -236,11 +223,15 @@ export class AvatarManager {
 
     avatarDisplay.innerHTML = `
       <div class="main-avatar-container" id="mainAvatar">
-        <div class="loading-main">Loading ${avatar.name}...</div>
+        <div class="main-avatar-display">
+          <div class="avatar-face">🤖</div>
+          <div class="avatar-name">${avatar.name}</div>
+          <div class="avatar-status-text" id="mainStatus">Ready to chat</div>
+        </div>
       </div>
     `;
 
-    // Load full-size avatar
+    // Load avatar
     this.loadMainAvatar(avatar);
   }
 
@@ -254,25 +245,10 @@ export class AvatarManager {
           autoStart: true
         });
         
-        // Store reference for state updates
         this.avatars.set(`main-${avatar.id}`, mainAvatar);
       } catch (error) {
         console.error(`Failed to load main avatar ${avatar.id}:`, error);
-        mainContainer.innerHTML = '<div class="error-main">Failed to load avatar</div>';
       }
-    }
-  }
-
-  private updateAvatarState(avatarId: number, state: string) {
-    const statusElement = document.getElementById(`status-${avatarId}`);
-    if (statusElement) {
-      statusElement.className = `avatar-status ${state.toLowerCase()}`;
-    }
-
-    // Update main avatar if it's the selected one
-    const mainAvatar = this.avatars.get(`main-${avatarId}`);
-    if (mainAvatar && this.selectedAvatarId === avatarId) {
-      mainAvatar.setState(state);
     }
   }
 
@@ -284,7 +260,10 @@ export class AvatarManager {
     
     if (!message) return;
     
-    // Add user message to chat
+    const avatar = this.avatarConfigs.find(a => a.id === this.selectedAvatarId);
+    if (!avatar) return;
+    
+    // Add user message
     const userMessage: ChatMessage = {
       avatarId: this.selectedAvatarId,
       avatarName: 'You',
@@ -295,15 +274,74 @@ export class AvatarManager {
     };
     
     this.addChatMessage(userMessage);
-    
-    // Send to server
-    this.socket.emit('sendMessage', {
-      avatarId: this.selectedAvatarId,
-      message,
-      userId: this.socket.id
-    });
-    
     messageInput.value = '';
+    
+    // Simulate avatar response
+    this.simulateAvatarResponse(avatar, message);
+  }
+
+  private simulateAvatarResponse(avatar: AvatarConfig, userMessage: string) {
+    // Update status
+    this.updateAvatarState(avatar.id, 'Listening');
+    
+    setTimeout(() => {
+      this.updateAvatarState(avatar.id, 'Thinking');
+      
+      setTimeout(() => {
+        this.updateAvatarState(avatar.id, 'Responding');
+        
+        // Generate response based on personality
+        const response = this.generateResponse(userMessage, avatar.personality);
+        
+        const avatarMessage: ChatMessage = {
+          avatarId: avatar.id,
+          avatarName: avatar.name,
+          message: response,
+          timestamp: new Date().toISOString(),
+          messageId: `avatar-${Date.now()}`
+        };
+        
+        this.addChatMessage(avatarMessage);
+        
+        setTimeout(() => {
+          this.updateAvatarState(avatar.id, 'Idle');
+        }, 2000);
+      }, 1500);
+    }, 500);
+  }
+
+  private generateResponse(text: string, personality: string): string {
+    const responses = {
+      friendly: `Hi there! I heard you say "${text}". That's really interesting! How can I help you today?`,
+      professional: `Thank you for your message: "${text}". I'm here to assist you with any questions you may have.`,
+      creative: `Wow, "${text}" - that sparks so many creative ideas! Let me think of something amazing to share with you.`,
+      analytical: `I've processed your input: "${text}". Based on my analysis, here are some insights I can provide.`,
+      empathetic: `I understand you mentioned "${text}". I can sense this might be important to you. I'm here to listen.`,
+      humorous: `Haha, "${text}" - you know what? That reminds me of something funny! Let me brighten your day.`,
+      serious: `Regarding your statement "${text}", I want to provide you with a thoughtful and comprehensive response.`,
+      optimistic: `"${text}" - what a wonderful thing to share! I'm excited to explore this topic with you further.`,
+      curious: `"${text}" - now that's fascinating! I have so many questions about this. Tell me more!`,
+      supportive: `I appreciate you sharing "${text}" with me. I want you to know that I'm here to support you.`
+    };
+    
+    return responses[personality as keyof typeof responses] || `Thank you for saying "${text}". I'm here to chat with you!`;
+  }
+
+  private updateAvatarState(avatarId: number, state: string) {
+    const statusElement = document.getElementById(`status-${avatarId}`);
+    if (statusElement) {
+      statusElement.className = `avatar-status ${state.toLowerCase()}`;
+    }
+
+    const mainStatus = document.getElementById('mainStatus');
+    if (mainStatus && this.selectedAvatarId === avatarId) {
+      mainStatus.textContent = state;
+    }
+
+    const mainAvatar = this.avatars.get(`main-${avatarId}`);
+    if (mainAvatar && this.selectedAvatarId === avatarId) {
+      mainAvatar.setState(state);
+    }
   }
 
   private addChatMessage(message: ChatMessage) {
@@ -323,7 +361,6 @@ export class AvatarManager {
     this.chatContainer.appendChild(messageElement);
     this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
     
-    // Add typing animation for avatar responses
     if (!message.isUser) {
       messageElement.classList.add('typing');
       setTimeout(() => {
@@ -354,10 +391,10 @@ export class AvatarManager {
   }
 
   private updateStats() {
-    const activeAvatarsCount = this.avatars.size;
+    const activeAvatarsCount = this.avatarConfigs.length;
     const activeAvatarsElement = document.getElementById('activeAvatars');
     if (activeAvatarsElement) {
-      activeAvatarsElement.textContent = `Active Avatars: ${activeAvatarsCount}`;
+      activeAvatarsElement.textContent = `Total Avatars: ${activeAvatarsCount}`;
     }
   }
 
@@ -475,6 +512,9 @@ export class AvatarManager {
         border-radius: 8px;
         margin-bottom: 0.5rem;
         overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
 
       .avatar-status {
@@ -487,7 +527,7 @@ export class AvatarManager {
         z-index: 2;
       }
 
-      .avatar-status.idle { background: #gray; }
+      .avatar-status.idle { background: #666; }
       .avatar-status.listening { background: #00ff88; animation: pulse 1s infinite; }
       .avatar-status.thinking { background: #ffa500; animation: pulse 0.5s infinite; }
       .avatar-status.responding { background: #ff4757; animation: pulse 0.3s infinite; }
@@ -504,7 +544,11 @@ export class AvatarManager {
         align-items: center;
         justify-content: center;
         color: white;
-        font-size: 0.8rem;
+        font-size: 2rem;
+      }
+
+      .avatar-icon {
+        font-size: 2rem;
       }
 
       .avatar-info h3 {
@@ -529,6 +573,7 @@ export class AvatarManager {
         padding: 1rem 2rem;
         background: rgba(255, 255, 255, 0.05);
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        color: white;
       }
 
       .selected-avatar-details h2 {
@@ -578,6 +623,27 @@ export class AvatarManager {
         border-radius: 50%;
         margin: 0 auto 1rem;
         animation: pulse 2s infinite;
+      }
+
+      .main-avatar-display {
+        text-align: center;
+        color: white;
+      }
+
+      .avatar-face {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+      }
+
+      .avatar-name {
+        font-size: 1.2rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+      }
+
+      .avatar-status-text {
+        font-size: 0.9rem;
+        opacity: 0.8;
       }
 
       .chat-container {
@@ -670,7 +736,6 @@ export class AvatarManager {
         100% { opacity: 1; transform: translateY(0); }
       }
 
-      /* Scrollbar styles */
       ::-webkit-scrollbar {
         width: 6px;
       }
