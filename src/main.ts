@@ -14,6 +14,10 @@ function initApp() {
   
   try {
     const avatarManager = new AvatarManager(container);
+    
+    // Make globally available for onclick handlers
+    (window as any).avatarManager = avatarManager;
+    
     avatarManager.start();
     
     // Hide loading screen
