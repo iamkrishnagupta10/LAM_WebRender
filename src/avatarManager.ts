@@ -22,11 +22,11 @@ export interface ChatMessage {
 
 export class AvatarManager {
   private socket: Socket;
-  private avatars: Map<number, GaussianAvatar> = new Map();
+  private avatars: Map<string, GaussianAvatar> = new Map();
   private avatarConfigs: AvatarConfig[] = [];
   private selectedAvatarId: number | null = null;
-  private chatContainer: HTMLElement;
-  private avatarGrid: HTMLElement;
+  private chatContainer!: HTMLElement;
+  private avatarGrid!: HTMLElement;
   private chatMessages: ChatMessage[] = [];
   
   constructor(
@@ -135,7 +135,7 @@ export class AvatarManager {
       this.updateStats();
     });
 
-    this.socket.on('avatarStateUpdate', ({ avatarId, state }) => {
+    this.socket.on('avatarStateUpdate', ({ avatarId, state }: { avatarId: number; state: string }) => {
       this.updateAvatarState(avatarId, state);
     });
 
@@ -167,7 +167,7 @@ export class AvatarManager {
         <div class="avatar-info">
           <h3>${config.name}</h3>
           <p class="personality">${config.personality}</p>
-          <p class="model">${config.modelType.split('_')[1]}</p>
+          <p class="model">${config.modelType.split('_')[1] || 'AI Model'}</p>
         </div>
       `;
 
@@ -179,7 +179,7 @@ export class AvatarManager {
     });
   }
 
-  private async loadMiniAvatar(config: AvatarConfig) {
+  private loadMiniAvatar(config: AvatarConfig) {
     const miniContainer = document.getElementById(`mini-${config.id}`);
     if (miniContainer) {
       try {
@@ -189,7 +189,7 @@ export class AvatarManager {
           height: 80,
           autoStart: true
         });
-        this.avatars.set(config.id, miniAvatar);
+        this.avatars.set(config.id.toString(), miniAvatar);
       } catch (error) {
         console.error(`Failed to load mini avatar ${config.id}:`, error);
         miniContainer.innerHTML = '<div class="error-placeholder">❌</div>';
@@ -229,7 +229,7 @@ export class AvatarManager {
         <h2>${avatar.name}</h2>
         <div class="avatar-badges">
           <span class="badge personality">${avatar.personality}</span>
-          <span class="badge model">${avatar.modelType.split('_')[1]}</span>
+          <span class="badge model">${avatar.modelType.split('_')[1] || 'AI Model'}</span>
         </div>
       </div>
     `;
@@ -244,7 +244,7 @@ export class AvatarManager {
     this.loadMainAvatar(avatar);
   }
 
-  private async loadMainAvatar(avatar: AvatarConfig) {
+  private loadMainAvatar(avatar: AvatarConfig) {
     const mainContainer = document.getElementById('mainAvatar');
     if (mainContainer) {
       try {
