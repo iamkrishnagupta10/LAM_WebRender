@@ -1,7 +1,13 @@
-import { GaussianAvatar } from './gaussianAvatar';
+import { AvatarManager } from './avatarManager';
 
-const div = document.getElementById('LAM_WebRender');
-const assetPath = './asset/arkit/p2-1.zip';
+// Initialize the 100 AI Avatars application
+const container = document.getElementById('LAM_WebRender');
 
-const gaussianAvatar = new GaussianAvatar(div, assetPath);
-gaussianAvatar.start();
+if (container) {
+  const avatarManager = new AvatarManager(container);
+  avatarManager.start();
+  
+  console.log('🚀 Starting 100 AI Avatars with ModelScope integration...');
+} else {
+  console.error('Container element not found!');
+}
