@@ -5,19 +5,121 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="x-ua-compatible" content="ie=edge">
-  <title>3D Gaussian Splat Demo</title>
+  <title>Avatar Chat - Talk to Your Beautiful Live Avatar</title>
+  <meta name="description" content="Interactive avatar chat application with 100+ ModelScope avatars. Talk to your beautiful live avatar with advanced AI conversation capabilities.">
+  
+  <!-- Preload critical fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='0.9em' font-size='90'%3E🤖%3C/text%3E%3C/svg%3E">
+  
   <style>
-    #LAM_WebRender {
-      background-color: #ffffff;
+    /* Critical CSS for fast loading */
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      background: linear-gradient(135deg, #1e1b4b 0%, #1e3a8a 50%, #312e81 100%);
+      overflow: hidden;
       height: 100vh;
-      margin: 0px;
+    }
+    
+    #app {
+      height: 100vh;
+      width: 100vw;
+    }
+    
+    /* Loading spinner */
+    .loading-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background: linear-gradient(135deg, #1e1b4b 0%, #1e3a8a 50%, #312e81 100%);
+      color: white;
+      flex-direction: column;
+    }
+    
+    .loading-spinner {
+      width: 60px;
+      height: 60px;
+      border: 4px solid rgba(255, 255, 255, 0.1);
+      border-top: 4px solid #8b5cf6;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .loading-text {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    
+    .loading-subtitle {
+      font-size: 14px;
+      opacity: 0.7;
+    }
+    
+    /* Hide the loading container once Vue app loads */
+    .vue-loaded .loading-container {
+      display: none;
     }
   </style>
 </head>
 
 <body>
-  <div id="LAM_WebRender"></div>
+  <!-- Loading screen -->
+  <div class="loading-container" id="loading">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Loading Avatar Chat</div>
+    <div class="loading-subtitle">Initializing 100+ beautiful avatars...</div>
+  </div>
+
+  <!-- Vue app container -->
+  <div id="app"></div>
+  
+  <!-- LAM WebRender container for Gaussian Avatar -->
+  <div id="LAM_WebRender" style="display: none;"></div>
+
   <script type="module" src="/src/main.ts"></script>
+  
+  <script>
+    // Hide loading screen once the page is fully loaded
+    window.addEventListener('load', function() {
+      setTimeout(() => {
+        const loading = document.getElementById('loading');
+        if (loading) {
+          loading.style.opacity = '0';
+          loading.style.transition = 'opacity 0.5s ease';
+          setTimeout(() => {
+            loading.style.display = 'none';
+            document.body.classList.add('vue-loaded');
+          }, 500);
+        }
+      }, 1000);
+    });
+    
+    // Error handling
+    window.addEventListener('error', function(e) {
+      console.error('Application error:', e);
+      const loading = document.getElementById('loading');
+      if (loading) {
+        loading.innerHTML = `
+          <div class="loading-spinner" style="border-top-color: #ef4444;"></div>
+          <div class="loading-text" style="color: #ef4444;">Error Loading Application</div>
+          <div class="loading-subtitle">Please refresh the page to try again</div>
+        `;
+      }
+    });
+  </script>
 </body>
 
 </html>
