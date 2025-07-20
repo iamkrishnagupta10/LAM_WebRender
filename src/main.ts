@@ -71,6 +71,38 @@ function addMinimalUI() {
         font-size: 10px;
         display: none;
       ">🧪 Test AI</button>
+      <button id="textChatButton" style="
+        background: #4CAF50;
+        border: none;
+        color: white;
+        padding: 5px 10px;
+        margin-top: 5px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 10px;
+      ">💬 Type Chat</button>
+      <div id="textInputArea" style="
+        margin-top: 10px;
+        display: none;
+      ">
+        <input id="chatTextInput" type="text" placeholder="Type your message..." style="
+          width: 200px;
+          padding: 5px;
+          border: 1px solid #ccc;
+          border-radius: 5px;
+          font-size: 12px;
+        ">
+        <button id="sendTextButton" style="
+          background: #4CAF50;
+          border: none;
+          color: white;
+          padding: 5px 10px;
+          margin-left: 5px;
+          border-radius: 5px;
+          cursor: pointer;
+          font-size: 10px;
+        ">Send</button>
+      </div>
     </div>
     
     <div id="conversationHint" style="
