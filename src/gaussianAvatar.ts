@@ -6,7 +6,7 @@ export class GaussianAvatar {
   private _avatarDivEle: HTMLDivElement;
   private _assetsPath = "";
   public curState = "Idle";
-  private _renderer: GaussianSplats3D.GaussianSplatRenderer;
+  private _renderer!: GaussianSplats3D.GaussianSplatRenderer;
   constructor(container: HTMLDivElement, assetsPath: string) {
     this._avatarDivEle = container;
     this._assetsPath = assetsPath;
