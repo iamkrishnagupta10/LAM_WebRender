@@ -1,233 +1,207 @@
 
-import * as GaussianSplats3D from "gaussian-splat-renderer-for-lam"
+import * as THREE from 'three';
 
 export class GaussianAvatar {
-  private _avatarDivEle: HTMLDivElement;
-  private _assetsPath = "";
-  public curState = "Idle";
-  private _renderer!: GaussianSplats3D.GaussianSplatRenderer;
-  private bsData: any = null;
-  private lamExpressions: any[] = [];
-  private lamStartTime: number = 0;
-  private lamDuration: number = 0;
-  private useLAMExpressions: boolean = false;
-  
-  constructor(container: HTMLDivElement, assetsPath: string) {
-    console.log('GaussianAvatar constructor called with:', container, assetsPath);
-    this._avatarDivEle = container;
-    this._assetsPath = assetsPath;
-    this._init();
-  }
-  
-  private _init() {
-    console.log('Initializing avatar with div:', this._avatarDivEle, 'path:', this._assetsPath);
-    if (!this._avatarDivEle || !this._assetsPath) {
-      throw new Error("Lack of necessary initialization parameters");
-    }
-    console.log('Avatar initialization completed');
+  private canvas: HTMLCanvasElement;
+  private scene: THREE.Scene;
+  private camera: THREE.PerspectiveCamera;
+  private renderer: THREE.WebGLRenderer;
+  private avatar: THREE.Object3D | null = null;
+  private currentExpressions: number[] = [];
+
+  constructor(canvas: HTMLCanvasElement) {
+    this.canvas = canvas;
+    this.scene = new THREE.Scene();
+    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    
+    this.setupScene();
   }
 
-  private async loadExpressionData() {
+  private setupScene() {
+    // Basic scene setup
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setClearColor(0x000000);
+    
+    // Add lighting
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+    this.scene.add(ambientLight);
+    
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(0, 1, 1);
+    this.scene.add(directionalLight);
+    
+    // Position camera
+    this.camera.position.set(0, 0, 5);
+    this.camera.lookAt(0, 0, 0);
+    
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      this.camera.aspect = window.innerWidth / window.innerHeight;
+      this.camera.updateProjectionMatrix();
+      this.renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+    
+    // Start render loop
+    this.animate();
+  }
+
+  async initialize() {
     try {
-      console.log('Loading expression data...');
-      const response = await fetch('/asset/test_expression_1s.json');
-      if (!response.ok) {
-        throw new Error(`Failed to load expression data: ${response.status}`);
-      }
-      this.bsData = await response.json();
-      console.log('Expression data loaded successfully:', this.bsData ? 'Yes' : 'No');
+      console.log('Initializing avatar...');
+      
+      // Create a simple avatar placeholder (sphere with face-like features)
+      await this.createSimpleAvatar();
+      
+      console.log('Avatar initialized successfully');
     } catch (error) {
-      console.error('Error loading expression data:', error);
+      console.error('Avatar initialization error:', error);
       throw error;
     }
   }
 
-  public start() {
-    console.log('Starting avatar render...');
-    this.render();
+  private async createSimpleAvatar() {
+    // Create a simple 3D head representation
+    const group = new THREE.Group();
+    
+    // Head (sphere)
+    const headGeometry = new THREE.SphereGeometry(1, 32, 32);
+    const headMaterial = new THREE.MeshPhongMaterial({ color: 0xffdbac });
+    const head = new THREE.Mesh(headGeometry, headMaterial);
+    group.add(head);
+    
+    // Eyes
+    const eyeGeometry = new THREE.SphereGeometry(0.1, 16, 16);
+    const eyeMaterial = new THREE.MeshPhongMaterial({ color: 0x000000 });
+    
+    const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+    leftEye.position.set(-0.3, 0.2, 0.8);
+    group.add(leftEye);
+    
+    const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+    rightEye.position.set(0.3, 0.2, 0.8);
+    group.add(rightEye);
+    
+    // Mouth
+    const mouthGeometry = new THREE.SphereGeometry(0.2, 16, 16);
+    const mouthMaterial = new THREE.MeshPhongMaterial({ color: 0x8B0000 });
+    const mouth = new THREE.Mesh(mouthGeometry, mouthMaterial);
+    mouth.position.set(0, -0.3, 0.8);
+    mouth.scale.set(1, 0.5, 0.5);
+    group.add(mouth);
+    
+    this.avatar = group;
+    this.scene.add(group);
   }
 
-  public setState(newState: string) {
-    console.log(`Avatar state changed from ${this.curState} to ${newState}`);
-    this.curState = newState;
+  applyLAMExpressions(expressions: number[][]) {
+    if (!this.avatar || !expressions || expressions.length === 0) {
+      return;
+    }
+
+    console.log(`Applying ${expressions.length} expression frames`);
     
-    // Add visual feedback for state changes
-    this.triggerStateExpression(newState);
+    // Store expressions for animation
+    this.currentExpressions = expressions[0] || [];
+    
+    // Animate the expressions over time
+    this.animateExpressions(expressions);
   }
 
-  private triggerStateExpression(state: string) {
-    // Trigger different expressions based on state
-    switch(state) {
-      case "Listening":
-        console.log('Triggering listening expression - attentive look');
-        // Reset LAM expressions when starting to listen
-        this.useLAMExpressions = false;
-        break;
-      case "Thinking":
-        console.log('Triggering thinking expression - contemplative look');
-        break;
-      case "Responding":
-        console.log('Triggering speaking expression - animated mouth');
-        break;
-      case "Idle":
-        console.log('Triggering idle expression - relaxed look');
-        // Reset LAM expressions when going idle
-        this.useLAMExpressions = false;
-        break;
-    }
-  }
-
-  public applyLAMExpressions(expressions: any[], duration: number) {
-    console.log('Applying LAM expressions:', expressions.length, 'frames for', duration, 'seconds');
-    this.lamExpressions = expressions;
-    this.lamDuration = duration;
-    this.lamStartTime = performance.now() / 1000;
-    this.useLAMExpressions = true;
+  private animateExpressions(expressions: number[][]) {
+    const duration = expressions.length / 30.0; // 30 FPS
+    const startTime = Date.now();
     
-    // Automatically disable LAM expressions after duration
-    setTimeout(() => {
-      console.log('LAM expressions finished, returning to default');
-      this.useLAMExpressions = false;
-    }, duration * 1000 + 500); // Add small buffer
-  }
-
-  public async render() {
-    try {
-      console.log('Starting Gaussian Splat renderer...');
-      console.log('Container element:', this._avatarDivEle);
-      console.log('Asset path:', this._assetsPath);
+    const animate = () => {
+      const elapsed = (Date.now() - startTime) / 1000;
+      const progress = elapsed / duration;
       
-      // Load expression data first
-      await this.loadExpressionData();
-      
-      this._renderer = await GaussianSplats3D.GaussianSplatRenderer.getInstance(
-        this._avatarDivEle,
-        this._assetsPath,
-        {
-          getChatState: this.getChatState.bind(this),
-          getExpressionData: this.getArkitFaceFrame.bind(this),
-          backgroundColor: "0x000000"
-        },
-      );
-      
-      console.log('Renderer created successfully:', this._renderer);
-      
-      this.startTime = performance.now() / 1000;
-      console.log('Animation cycle started at time:', this.startTime);
-      
-      // Remove the automatic state changes - now controlled by voice interaction
-      console.log('Avatar ready for LAM_Audio2Expression interaction!');
-
-    } catch (error) {
-      console.error('Error in render method:', error);
-      throw error;
-    }
-  }
-  
-  expressitionData: any;
-  startTime = 0
-  
-  public getChatState() {
-    // Log state changes for debugging
-    if (Math.random() < 0.01) { // Log occasionally to avoid spam
-      console.log('getChatState called, returning:', this.curState);
-    }
-    return this.curState;
-  }
-  
-  public getArkitFaceFrame(): any {
-    // Check if we should use LAM expressions instead of default
-    if (this.useLAMExpressions && this.lamExpressions.length > 0) {
-      return this.getLAMExpressionFrame();
-    }
-
-    if (!this.bsData) {
-      console.warn('Expression data not loaded yet');
-      return {};
-    }
-
-    const length = this.bsData["frames"].length
-    const frameInfoInternal = 1.0 / 30.0;
-    const currentTime = performance.now() / 1000;
-    const calcDelta = (currentTime - this.startTime)%(length * frameInfoInternal);
-    const frameIndex = Math.floor(calcDelta / frameInfoInternal)
-    this.expressitionData ={};
-
-    this.bsData["names"].forEach((name: string, index: number) => {
-      this.expressitionData[name] = this.bsData["frames"][frameIndex]["weights"][index]
-    })
-    
-    // Log occasionally to see if this is being called
-    if (frameIndex % 30 === 0 && Math.random() < 0.1) {
-      console.log('getArkitFaceFrame called, frame:', frameIndex, 'expressions:', Object.keys(this.expressitionData).length);
-    }
-    
-    return this.expressitionData;
-  }
-
-  private getLAMExpressionFrame(): any {
-    const currentTime = performance.now() / 1000;
-    const elapsed = currentTime - this.lamStartTime;
-    
-    if (elapsed > this.lamDuration) {
-      // LAM expressions finished
-      this.useLAMExpressions = false;
-      return this.getArkitFaceFrame(); // Fall back to default
-    }
-    
-    // Calculate which LAM expression frame to use
-    const frameRate = this.lamExpressions.length / this.lamDuration;
-    const frameIndex = Math.floor(elapsed * frameRate);
-    
-    if (frameIndex >= 0 && frameIndex < this.lamExpressions.length) {
-      const lamFrame = this.lamExpressions[frameIndex];
-      
-      // Convert LAM expression format to ARKit format
-      this.expressitionData = this.convertLAMToARKit(lamFrame);
-      
-      // Log occasionally
-      if (frameIndex % 10 === 0) {
-        console.log('Using LAM expression frame:', frameIndex, '/', this.lamExpressions.length, 'elapsed:', elapsed.toFixed(2));
+      if (progress >= 1.0) {
+        // Animation complete
+        this.resetExpressions();
+        return;
       }
       
-      return this.expressitionData;
-    }
+      // Get current frame
+      const frameIndex = Math.floor(progress * expressions.length);
+      const frame = expressions[frameIndex] || [];
+      
+      this.applyExpressionFrame(frame);
+      
+      requestAnimationFrame(animate);
+    };
     
-    // Fallback to default if frame index is out of range
-    return this.getArkitFaceFrame();
+    animate();
   }
 
-  private convertLAMToARKit(lamFrame: any): any {
-    // Convert LAM expression data to ARKit blendshape format
-    // This is a simplified conversion - in reality you'd need proper mapping
-    const arkitData: any = {};
+  private applyExpressionFrame(expression: number[]) {
+    if (!this.avatar || !expression) return;
     
-    if (Array.isArray(lamFrame) && lamFrame.length >= 52) {
-      // Assuming LAM expressions are in ARKit order already
-      // Map to ARKit blendshape names
-      const arkitNames = [
-        'eyeBlinkLeft', 'eyeLookDownLeft', 'eyeLookInLeft', 'eyeLookOutLeft', 'eyeLookUpLeft',
-        'eyeSquintLeft', 'eyeWideLeft', 'eyeBlinkRight', 'eyeLookDownRight', 'eyeLookInRight',
-        'eyeLookOutRight', 'eyeLookUpRight', 'eyeSquintRight', 'eyeWideRight', 'jawForward',
-        'jawLeft', 'jawRight', 'jawOpen', 'mouthClose', 'mouthFunnel', 'mouthPucker',
-        'mouthLeft', 'mouthRight', 'mouthSmileLeft', 'mouthSmileRight', 'mouthFrownLeft',
-        'mouthFrownRight', 'mouthDimpleLeft', 'mouthDimpleRight', 'mouthStretchLeft',
-        'mouthStretchRight', 'mouthRollLower', 'mouthRollUpper', 'mouthShrugLower',
-        'mouthShrugUpper', 'mouthPressLeft', 'mouthPressRight', 'mouthLowerDownLeft',
-        'mouthLowerDownRight', 'mouthUpperUpLeft', 'mouthUpperUpRight', 'browDownLeft',
-        'browDownRight', 'browInnerUp', 'browOuterUpLeft', 'browOuterUpRight',
-        'cheekPuff', 'cheekSquintLeft', 'cheekSquintRight', 'noseSneerLeft', 'noseSneerRight', 'tongueOut'
-      ];
-      
-      // Map LAM values to ARKit names
-      for (let i = 0; i < Math.min(lamFrame.length, arkitNames.length); i++) {
-        arkitData[arkitNames[i]] = lamFrame[i];
-      }
-    } else if (typeof lamFrame === 'object') {
-      // If LAM frame is already an object, use it directly
-      Object.assign(arkitData, lamFrame);
+    // Extract key expression values (simplified ARKit mapping)
+    const jawOpen = expression[20] || 0; // Jaw open
+    const mouthOpen = expression[21] || 0; // Mouth open
+    const eyeBlinkLeft = expression[10] || 0; // Eye blink left
+    const eyeBlinkRight = expression[11] || 0; // Eye blink right
+    
+    // Apply to avatar parts
+    const mouth = this.avatar.children.find((child: THREE.Object3D) => 
+      child.position.y < 0 && child.position.z > 0
+    );
+    
+    if (mouth) {
+      // Animate mouth based on expressions
+      const openAmount = Math.max(jawOpen, mouthOpen);
+      mouth.scale.y = 0.5 + openAmount * 0.5;
+      mouth.scale.z = 0.5 + openAmount * 0.3;
     }
     
-    return arkitData;
+    // Animate eyes (blinks)
+    const eyes = this.avatar.children.filter((child: THREE.Object3D) => 
+      child.position.y > 0 && child.position.z > 0
+    );
+    
+    eyes.forEach((eye: THREE.Object3D, index: number) => {
+      const blinkAmount = index === 0 ? eyeBlinkLeft : eyeBlinkRight;
+      eye.scale.y = 1.0 - blinkAmount * 0.8;
+    });
+  }
+
+  private resetExpressions() {
+    if (!this.avatar) return;
+    
+    // Reset all expressions to neutral
+    const mouth = this.avatar.children.find((child: THREE.Object3D) => 
+      child.position.y < 0 && child.position.z > 0
+    );
+    
+    if (mouth) {
+      mouth.scale.set(1, 0.5, 0.5);
+    }
+    
+    const eyes = this.avatar.children.filter((child: THREE.Object3D) => 
+      child.position.y > 0 && child.position.z > 0
+    );
+    
+    eyes.forEach((eye: THREE.Object3D) => {
+      eye.scale.set(1, 1, 1);
+    });
+  }
+
+  private animate() {
+    requestAnimationFrame(() => this.animate());
+    
+    // Subtle head movement
+    if (this.avatar) {
+      const time = Date.now() * 0.001;
+      this.avatar.rotation.y = Math.sin(time * 0.5) * 0.1;
+      this.avatar.rotation.x = Math.sin(time * 0.3) * 0.05;
+    }
+    
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  setState(state: string) {
+    console.log(`Avatar state: ${state}`);
+    // Simple state management could be added here
   }
 }
