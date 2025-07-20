@@ -49,12 +49,23 @@ function addMinimalUI() {
       <div id="aiPipelineStatus" style="font-size: 10px; margin-top: 3px; opacity: 0.8;">
         Connecting to AI services...
       </div>
+      <button id="simpleTestButton" style="
+        background: #2196F3;
+        border: none;
+        color: white;
+        padding: 5px 10px;
+        margin-top: 5px;
+        margin-right: 5px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 10px;
+      ">🔗 Test API</button>
       <button id="debugTestButton" style="
         background: #ff9800;
         border: none;
         color: white;
         padding: 5px 10px;
-        margin-top: 8px;
+        margin-top: 5px;
         border-radius: 5px;
         cursor: pointer;
         font-size: 10px;
@@ -106,7 +117,8 @@ function addMinimalUI() {
   
   document.body.insertAdjacentHTML('beforeend', uiHtml);
   
-  // Add test button handler
+  // Add test button handlers
+  document.getElementById('simpleTestButton')?.addEventListener('click', testSimpleAPI);
   document.getElementById('debugTestButton')?.addEventListener('click', testAIDirectly);
 }
 
@@ -130,6 +142,49 @@ function debugLog(message: string) {
   }
 }
 
+async function testSimpleAPI() {
+  debugLog('🔗 Testing basic API connection...');
+  updateStatus('🔗 Testing API...');
+  
+  try {
+    const testUrl = `${AI_SERVER_URL}/simple-test`;
+    debugLog(`📡 Calling: ${testUrl}`);
+    
+    const response = await fetch(testUrl, {
+      method: 'GET'
+    });
+    
+    debugLog(`📡 Response status: ${response.status}`);
+    
+    if (!response.ok) {
+      throw new Error(`API test failed: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    debugLog(`✅ API Response: ${JSON.stringify(data, null, 2)}`);
+    
+    updateStatus(`✅ API Working! OpenAI Key: ${data.environment.hasOpenAIKey ? 'YES' : 'NO'}`);
+    
+    if (data.environment.hasOpenAIKey) {
+      // Show the AI test button if API key is available
+      const aiTestBtn = document.getElementById('debugTestButton');
+      if (aiTestBtn) {
+        aiTestBtn.style.display = 'inline-block';
+      }
+    }
+    
+  } catch (error) {
+    debugLog(`❌ API test failed: ${error}`);
+    updateStatus('❌ API test failed');
+    console.error('Simple API test error:', error);
+    
+    // Try to show what went wrong
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      debugLog('❌ Network error - check if site is deployed properly');
+    }
+  }
+}
+
 async function testAIDirectly() {
   debugLog('🧪 Testing AI directly...');
   updateStatus('🧪 Testing AI...');
@@ -148,6 +203,8 @@ async function testAIDirectly() {
     debugLog(`📡 Test response status: ${response.status}`);
     
     if (!response.ok) {
+      const errorText = await response.text();
+      debugLog(`❌ Error response: ${errorText}`);
       throw new Error(`Test failed: ${response.status}`);
     }
     
@@ -193,7 +250,7 @@ async function checkAIServerStatus() {
         statusElement.textContent = '✅ Full AI Pipeline Ready';
         statusElement.style.color = '#4CAF50';
         if (testButton) {
-          testButton.style.display = 'block';
+          testButton.style.display = 'inline-block';
         }
         debugLog('✅ All AI components ready');
         return true;
@@ -201,7 +258,7 @@ async function checkAIServerStatus() {
         statusElement.textContent = `⚠️ ${readyComponents.join(' ')} (${readyComponents.length}/4)`;
         statusElement.style.color = '#ff9800';
         if (testButton) {
-          testButton.style.display = 'block';
+          testButton.style.display = 'inline-block';
         }
         debugLog(`⚠️ Partial AI ready: ${readyComponents.join(', ')}`);
         return false;
@@ -537,6 +594,10 @@ if (div) {
     // Wait for avatar to load, then start conversation system
     setTimeout(async () => {
       hideLoadingIndicator();
+      
+      // First test basic API connectivity
+      debugLog('🚀 App loaded, testing basic connectivity...');
+      await testSimpleAPI();
       
       // Check AI services
       const aiReady = await checkAIServerStatus();
