@@ -3,7 +3,7 @@ import { GaussianAvatar } from './gaussianAvatar';
 console.log('Starting LAM WebRender...');
 
 const div = document.getElementById('LAM_WebRender') as HTMLDivElement;
-const assetPath = './asset/arkit/p2-1.zip';
+const assetPath = '/asset/arkit/p2-1.zip'; // Updated to use public directory
 
 console.log('Found div element:', div);
 console.log('Asset path:', assetPath);
