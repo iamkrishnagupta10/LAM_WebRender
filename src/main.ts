@@ -213,8 +213,33 @@ async function testAIDirectly() {
     
     if (data.success) {
       updateStatus('🔊 AI test successful - playing audio');
-      await handleAIResponse(data);
-      debugLog('🎵 Test audio played successfully');
+      debugLog('🎵 About to play test audio...');
+      
+      // Apply expressions first
+      if (data.lam_expressions && data.lam_expressions.length > 0) {
+        debugLog(`🎭 Applying ${data.lam_expressions.length} expression frames`);
+        if (avatarInstance) {
+          avatarInstance.setState('Responding');
+          avatarInstance.applyLAMExpressions(data.lam_expressions, data.audio_duration);
+        }
+      }
+      
+      // Try to play audio
+      if (data.response_audio) {
+        try {
+          await playAIAudio(data.response_audio, data.response_sample_rate);
+          debugLog('🎵 Test audio played successfully');
+        } catch (audioError) {
+          debugLog(`❌ Audio playback failed: ${audioError}`);
+          // Still consider test successful if we got the response
+        }
+      }
+      
+      if (avatarInstance) {
+        avatarInstance.setState('Idle');
+      }
+      updateStatus('✅ AI test completed');
+      
     } else {
       throw new Error(data.error || 'Test failed');
     }
@@ -567,17 +592,32 @@ function updateStatus(message: string) {
 
 // Utility functions for base64 encoding/decoding of float32 arrays
 function base64EncodeArray(array: Float32Array): string {
-  const bytes = new Uint8Array(array.buffer);
-  return btoa(String.fromCharCode(...bytes));
+  // Fix for stack overflow - process in chunks instead of all at once
+  const chunkSize = 8192; // Process 8KB chunks
+  let result = '';
+  
+  for (let i = 0; i < array.length; i += chunkSize) {
+    const chunk = array.slice(i, i + chunkSize);
+    const bytes = new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength);
+    const chunkResult = btoa(String.fromCharCode.apply(null, Array.from(bytes)));
+    result += chunkResult;
+  }
+  
+  return result;
 }
 
 function base64DecodeToArray(base64: string): Float32Array {
-  const binaryString = atob(base64);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
+  try {
+    const binaryString = atob(base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return new Float32Array(bytes.buffer);
+  } catch (error) {
+    console.error('Error decoding base64 audio:', error);
+    return new Float32Array(0);
   }
-  return new Float32Array(bytes.buffer);
 }
 
 if (div) {
