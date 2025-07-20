@@ -43,6 +43,32 @@ export class GaussianAvatar {
     this.render();
   }
 
+  public setState(newState: string) {
+    console.log(`Avatar state changed from ${this.curState} to ${newState}`);
+    this.curState = newState;
+    
+    // Add visual feedback for state changes
+    this.triggerStateExpression(newState);
+  }
+
+  private triggerStateExpression(state: string) {
+    // Trigger different expressions based on state
+    switch(state) {
+      case "Listening":
+        console.log('Triggering listening expression - attentive look');
+        break;
+      case "Thinking":
+        console.log('Triggering thinking expression - contemplative look');
+        break;
+      case "Responding":
+        console.log('Triggering speaking expression - animated mouth');
+        break;
+      case "Idle":
+        console.log('Triggering idle expression - relaxed look');
+        break;
+    }
+  }
+
   public async render() {
     try {
       console.log('Starting Gaussian Splat renderer...');
@@ -67,18 +93,8 @@ export class GaussianAvatar {
       this.startTime = performance.now() / 1000;
       console.log('Animation cycle started at time:', this.startTime);
       
-      setTimeout(() => {
-        console.log('Changing state to Listening');
-        this.curState = "Listening"
-      }, 5000);
-      setTimeout(() => {
-        console.log('Changing state to Thinking');
-        this.curState = "Thinking"
-      }, 6000);
-      setTimeout(() => {
-        console.log('Changing state to Responding');
-        this.curState = "Responding"
-      }, 10000);
+      // Remove the automatic state changes - now controlled by voice interaction
+      console.log('Avatar ready for voice interaction!');
 
     } catch (error) {
       console.error('Error in render method:', error);
@@ -90,7 +106,10 @@ export class GaussianAvatar {
   startTime = 0
   
   public getChatState() {
-    console.log('getChatState called, returning:', this.curState);
+    // Log state changes for debugging
+    if (Math.random() < 0.01) { // Log occasionally to avoid spam
+      console.log('getChatState called, returning:', this.curState);
+    }
     return this.curState;
   }
   
@@ -112,7 +131,7 @@ export class GaussianAvatar {
     })
     
     // Log occasionally to see if this is being called
-    if (frameIndex % 30 === 0) {
+    if (frameIndex % 30 === 0 && Math.random() < 0.1) {
       console.log('getArkitFaceFrame called, frame:', frameIndex, 'expressions:', Object.keys(this.expressitionData).length);
     }
     
