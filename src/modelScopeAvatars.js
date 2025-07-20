@@ -1,5 +1,5 @@
 // ModelScope Avatar Gallery Integration
-// This module handles loading and managing the 100 avatars from LiteAvatarGallery
+// This module handles loading and managing avatars with the available assets
 
 export class ModelScopeAvatarLoader {
   constructor() {
@@ -8,12 +8,12 @@ export class ModelScopeAvatarLoader {
     this.initialized = false
   }
 
-  // Initialize the avatar gallery with 100 diverse avatars
+  // Initialize the avatar gallery with available assets
   async initialize() {
     if (this.initialized) return this.avatars
 
     try {
-      // Generate 100 diverse avatars based on the LiteAvatarGallery structure
+      // Create avatars based on the available asset (p2-1.zip)
       this.avatars = this.generateAvatarGallery()
       this.initialized = true
       console.log('ModelScope Avatar Gallery initialized with', this.avatars.length, 'avatars')
@@ -27,94 +27,93 @@ export class ModelScopeAvatarLoader {
   generateAvatarGallery() {
     const avatars = []
     
-    // Categories for diverse avatar types
-    const categories = {
-      'Assistant': { count: 15, types: ['AI Assistant', 'Virtual Helper', 'Digital Guide'] },
-      'Anime': { count: 20, types: ['Anime Character', 'Manga Style', 'Kawaii'] },
-      'Professional': { count: 15, types: ['Business', 'Academic', 'Corporate'] },
-      'Celebrity': { count: 20, types: ['Japanese Idol', 'K-Pop Star', 'Influencer'] },
-      'Character': { count: 15, types: ['Fantasy', 'Sci-Fi', 'Historical'] },
-      'Realistic': { count: 15, types: ['Photorealistic', 'Human-like', 'Natural'] }
-    }
-
-    // Avatar name pools for diversity
-    const namesByCategory = {
-      'Assistant': ['Aurora', 'Sage', 'Echo', 'Nova', 'Iris', 'Zara', 'Kai', 'Luna', 'Aria', 'Neo', 'Vega', 'Orion', 'Stella', 'Phoenix', 'Atlas'],
-      'Anime': ['Sakura', 'Yuki', 'Hana', 'Rin', 'Akira', 'Miku', 'Rei', 'Ami', 'Yui', 'Kana', 'Nana', 'Saki', 'Yuna', 'Emi', 'Haru', 'Kira', 'Mio', 'Rui', 'Sora', 'Taki'],
-      'Professional': ['Alex', 'Jordan', 'Morgan', 'Taylor', 'Casey', 'Riley', 'Quinn', 'Blake', 'Drew', 'Sage', 'Cameron', 'Avery', 'Emery', 'Rowan', 'Finley'],
-      'Celebrity': ['Kira', 'Luna', 'Maya', 'Zoe', 'Chloe', 'Sofia', 'Emma', 'Olivia', 'Ava', 'Mia', 'Isabella', 'Lily', 'Grace', 'Aria', 'Zara', 'Nina', 'Vera', 'Ella', 'Ruby', 'Jade'],
-      'Character': ['Lyra', 'Zephyr', 'Raven', 'Jade', 'Ember', 'Frost', 'Storm', 'Blaze', 'Dawn', 'Ivy', 'Rose', 'Willow', 'Sage', 'River', 'Sky'],
-      'Realistic': ['Emma', 'Sophia', 'Olivia', 'Ava', 'Mia', 'Isabella', 'Riley', 'Aria', 'Zoe', 'Nora', 'Lily', 'Eleanor', 'Hannah', 'Lillian', 'Addison']
-    }
-
-    let id = 1
-    
-    Object.entries(categories).forEach(([category, config]) => {
-      const names = namesByCategory[category]
-      const types = config.types
+    // Create different personality variations of the same avatar model
+    // Since we only have p2-1.zip, we'll create different "personas" using the same 3D model
+    const avatarPersonas = [
+      // Assistant Category
+      { id: 1, name: 'Aurora', type: 'AI Assistant', category: 'Assistant', personality: 'helpful and knowledgeable', voice: 'warm' },
+      { id: 2, name: 'Sage', type: 'Virtual Helper', category: 'Assistant', personality: 'wise and patient', voice: 'calm' },
+      { id: 3, name: 'Echo', type: 'Digital Guide', category: 'Assistant', personality: 'friendly and supportive', voice: 'cheerful' },
       
-      for (let i = 0; i < config.count; i++) {
-        const name = names[i % names.length]
-        const type = types[i % types.length]
-        const nameIndex = Math.floor(i / names.length) + 1
-        const finalName = nameIndex > 1 ? `${name} ${nameIndex}` : name
-        
-        avatars.push({
-          id: id++,
-          name: finalName,
-          type: type,
-          category: category,
-          description: this.generateDescription(finalName, type, category),
-          modelPath: this.generateModelPath(finalName, category),
-          thumbnail: this.generateThumbnail(finalName, category),
-          characteristics: this.generateCharacteristics(category),
-          personality: this.generatePersonality(category),
-          voice: this.generateVoiceSettings(category),
-          animations: this.generateAnimations(category)
-        })
-      }
+      // Anime Category
+      { id: 4, name: 'Sakura', type: 'Anime Character', category: 'Anime', personality: 'energetic and kawaii', voice: 'bright' },
+      { id: 5, name: 'Yuki', type: 'Manga Style', category: 'Anime', personality: 'sweet and playful', voice: 'cute' },
+      { id: 6, name: 'Hana', type: 'Kawaii', category: 'Anime', personality: 'bubbly and expressive', voice: 'animated' },
+      
+      // Professional Category
+      { id: 7, name: 'Alex', type: 'Business Expert', category: 'Professional', personality: 'confident and articulate', voice: 'professional' },
+      { id: 8, name: 'Morgan', type: 'Academic', category: 'Professional', personality: 'intellectual and precise', voice: 'scholarly' },
+      { id: 9, name: 'Taylor', type: 'Corporate Leader', category: 'Professional', personality: 'authoritative and composed', voice: 'executive' },
+      
+      // Celebrity Category
+      { id: 10, name: 'Luna', type: 'J-Pop Idol', category: 'Celebrity', personality: 'charismatic and entertaining', voice: 'melodic' },
+      { id: 11, name: 'Kira', type: 'K-Pop Star', category: 'Celebrity', personality: 'glamorous and confident', voice: 'dynamic' },
+      { id: 12, name: 'Zoe', type: 'Influencer', category: 'Celebrity', personality: 'trendy and engaging', voice: 'social' },
+      
+      // Character Category
+      { id: 13, name: 'Lyra', type: 'Fantasy Mage', category: 'Character', personality: 'mystical and wise', voice: 'ethereal' },
+      { id: 14, name: 'Nova', type: 'Sci-Fi Explorer', category: 'Character', personality: 'adventurous and curious', voice: 'futuristic' },
+      { id: 15, name: 'Ember', type: 'Warrior', category: 'Character', personality: 'brave and determined', voice: 'strong' },
+      
+      // Realistic Category
+      { id: 16, name: 'Emma', type: 'Natural Companion', category: 'Realistic', personality: 'genuine and relatable', voice: 'natural' },
+      { id: 17, name: 'Sophia', type: 'Life-like Avatar', category: 'Realistic', personality: 'authentic and warm', voice: 'human-like' },
+      { id: 18, name: 'Olivia', type: 'Photorealistic', category: 'Realistic', personality: 'conversational and friendly', voice: 'realistic' }
+    ]
+
+    avatarPersonas.forEach(persona => {
+      avatars.push({
+        id: persona.id,
+        name: persona.name,
+        type: persona.type,
+        category: persona.category,
+        description: this.generateDescription(persona.name, persona.type, persona.category, persona.personality),
+        modelPath: './asset/arkit/p2-1.zip', // All use the same available model
+        thumbnail: this.generateThumbnail(persona.name, persona.category),
+        characteristics: this.generateCharacteristics(persona.category),
+        personality: persona.personality,
+        voice: this.generateVoiceSettings(persona.category, persona.voice),
+        animations: this.generateAnimations(persona.category),
+        conversationStyle: this.generateConversationStyle(persona.category, persona.personality),
+        specialAbilities: this.generateSpecialAbilities(persona.category),
+        backstory: this.generateBackstory(persona.name, persona.type, persona.category)
+      })
     })
 
     return avatars
   }
 
-  generateDescription(name, type, category) {
+  generateDescription(name, type, category, personality) {
     const descriptions = {
       'Assistant': [
-        'A helpful and intelligent AI assistant ready to assist you',
-        'Your friendly digital companion for everyday tasks',
-        'An advanced AI guide with extensive knowledge',
-        'A supportive virtual helper with a warm personality'
+        `${name} is a ${personality} AI assistant who loves helping with any questions or tasks you might have.`,
+        `Meet ${name}, your dedicated virtual companion with a ${personality} approach to assistance.`,
+        `${name} is here to support you with their ${personality} demeanor and extensive knowledge base.`
       ],
       'Anime': [
-        'A charming anime-style character with expressive features',
-        'A kawaii avatar with vibrant personality',
-        'An energetic anime character full of life',
-        'A cute and friendly manga-style companion'
+        `${name} is a ${personality} anime character who brings joy and energy to every conversation!`,
+        `This ${personality} anime-style avatar loves to chat and share their vibrant personality.`,
+        `${name} is a delightful ${personality} character straight out of your favorite anime series.`
       ],
       'Professional': [
-        'A sophisticated professional avatar for business settings',
-        'An elegant and composed corporate representative',
-        'A knowledgeable expert in their field',
-        'A polished and articulate professional'
+        `${name} is a ${personality} professional who brings expertise and sophistication to every interaction.`,
+        `Meet ${name}, a ${personality} expert ready to discuss business, academics, or professional topics.`,
+        `${name} combines ${personality} communication with deep professional knowledge.`
       ],
       'Celebrity': [
-        'A charismatic performer with star quality',
-        'An influential personality with magnetic charm',
-        'A talented entertainer with captivating presence',
-        'A popular figure with engaging personality'
+        `${name} is a ${personality} performer who loves to entertain and connect with fans.`,
+        `This ${personality} celebrity avatar brings star quality to every conversation.`,
+        `${name} is a ${personality} entertainer who makes every chat feel like a VIP experience.`
       ],
       'Character': [
-        'A unique character with an intriguing backstory',
-        'A mystical being from another realm',
-        'An adventurous soul with tales to tell',
-        'A fascinating character with special abilities'
+        `${name} is a ${personality} character from a realm of adventure and magic.`,
+        `Meet ${name}, a ${personality} being with fascinating stories and unique perspectives.`,
+        `${name} brings a ${personality} presence from their extraordinary world.`
       ],
       'Realistic': [
-        'A lifelike avatar with natural expressions',
-        'A photorealistic companion with human-like qualities',
-        'A realistic representation with authentic features',
-        'A natural-looking avatar with genuine personality'
+        `${name} is a ${personality} companion who feels incredibly natural and human-like.`,
+        `This ${personality} avatar provides authentic, relatable conversations.`,
+        `${name} offers ${personality} interactions that feel genuinely human.`
       ]
     }
     
@@ -122,44 +121,24 @@ export class ModelScopeAvatarLoader {
     return categoryDescriptions[Math.floor(Math.random() * categoryDescriptions.length)]
   }
 
-  generateModelPath(name, category) {
-    const basePath = './asset/'
-    const categoryPaths = {
-      'Assistant': 'assistant',
-      'Anime': 'anime',
-      'Professional': 'professional',
-      'Celebrity': 'celebrity',
-      'Character': 'character',
-      'Realistic': 'realistic'
-    }
-    
-    const categoryPath = categoryPaths[category] || 'default'
-    const fileName = name.toLowerCase().replace(/\s+/g, '_')
-    return `${basePath}${categoryPath}/${fileName}.zip`
-  }
-
   generateThumbnail(name, category) {
-    // Generate placeholder thumbnail URL
     const colors = {
-      'Assistant': ['6366f1', '8b5cf6'],
-      'Anime': ['ec4899', 'f97316'],
-      'Professional': ['1f2937', '4b5563'],
-      'Celebrity': ['dc2626', 'ea580c'],
-      'Character': ['059669', '0d9488'],
-      'Realistic': ['7c3aed', '9333ea']
+      'Assistant': '6366f1',
+      'Anime': 'ec4899', 
+      'Professional': '1f2937',
+      'Celebrity': 'dc2626',
+      'Character': '059669',
+      'Realistic': '7c3aed'
     }
     
-    const categoryColors = colors[category] || colors['Assistant']
-    const colorFrom = categoryColors[0]
-    const colorTo = categoryColors[1]
-    
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=256&background=${colorFrom}&color=ffffff&format=png&rounded=true&bold=true`
+    const color = colors[category] || '6366f1'
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=256&background=${color}&color=ffffff&format=png&rounded=true&bold=true`
   }
 
   generateCharacteristics(category) {
     const characteristics = {
       'Assistant': ['Helpful', 'Knowledgeable', 'Patient', 'Reliable'],
-      'Anime': ['Energetic', 'Cute', 'Expressive', 'Cheerful'],
+      'Anime': ['Energetic', 'Expressive', 'Cheerful', 'Playful'],
       'Professional': ['Sophisticated', 'Articulate', 'Composed', 'Expert'],
       'Celebrity': ['Charismatic', 'Confident', 'Entertaining', 'Influential'],
       'Character': ['Unique', 'Mysterious', 'Adventurous', 'Magical'],
@@ -169,21 +148,8 @@ export class ModelScopeAvatarLoader {
     return characteristics[category] || characteristics['Assistant']
   }
 
-  generatePersonality(category) {
-    const personalities = {
-      'Assistant': 'friendly and helpful',
-      'Anime': 'energetic and playful',
-      'Professional': 'composed and knowledgeable',
-      'Celebrity': 'charismatic and engaging',
-      'Character': 'mysterious and intriguing',
-      'Realistic': 'natural and relatable'
-    }
-    
-    return personalities[category] || personalities['Assistant']
-  }
-
-  generateVoiceSettings(category) {
-    const voiceSettings = {
+  generateVoiceSettings(category, voiceType) {
+    const baseSettings = {
       'Assistant': { pitch: 'medium', tone: 'warm', accent: 'neutral' },
       'Anime': { pitch: 'high', tone: 'cheerful', accent: 'japanese' },
       'Professional': { pitch: 'medium-low', tone: 'confident', accent: 'neutral' },
@@ -192,50 +158,79 @@ export class ModelScopeAvatarLoader {
       'Realistic': { pitch: 'natural', tone: 'conversational', accent: 'regional' }
     }
     
-    return voiceSettings[category] || voiceSettings['Assistant']
+    return { ...baseSettings[category], voiceType } || { ...baseSettings['Assistant'], voiceType }
   }
 
   generateAnimations(category) {
     const animations = {
-      'Assistant': ['wave', 'nod', 'thinking', 'explaining'],
-      'Anime': ['bounce', 'sparkle', 'wink', 'dance'],
-      'Professional': ['handshake', 'present', 'gesture', 'formal_bow'],
-      'Celebrity': ['pose', 'smile', 'performance', 'charismatic_wave'],
-      'Character': ['magic_cast', 'mystical_gesture', 'heroic_pose', 'special_ability'],
-      'Realistic': ['natural_smile', 'casual_wave', 'conversation', 'laugh']
+      'Assistant': ['wave', 'nod', 'thinking', 'explaining', 'pointing', 'welcoming'],
+      'Anime': ['bounce', 'sparkle', 'wink', 'dance', 'excited_jump', 'cute_pose'],
+      'Professional': ['handshake', 'present', 'gesture', 'formal_bow', 'confident_stance', 'explaining'],
+      'Celebrity': ['pose', 'smile', 'performance', 'charismatic_wave', 'spotlight_dance', 'bow'],
+      'Character': ['magic_cast', 'mystical_gesture', 'heroic_pose', 'special_ability', 'battle_stance', 'meditation'],
+      'Realistic': ['natural_smile', 'casual_wave', 'conversation', 'laugh', 'thoughtful_nod', 'friendly_gesture']
     }
     
     return animations[category] || animations['Assistant']
   }
 
+  generateConversationStyle(category, personality) {
+    const styles = {
+      'Assistant': 'Uses helpful language, asks clarifying questions, provides structured answers',
+      'Anime': 'Uses kawaii expressions, emoticons, exclamation points, and playful language',
+      'Professional': 'Formal tone, industry terminology, structured responses, business etiquette',
+      'Celebrity': 'Engaging, confident, uses trending phrases, interactive and entertaining',
+      'Character': 'Mysterious references, unique perspective, storytelling elements, immersive roleplay',
+      'Realistic': 'Natural conversation flow, colloquial expressions, relatable experiences'
+    }
+    
+    return styles[category] || styles['Assistant']
+  }
+
+  generateSpecialAbilities(category) {
+    const abilities = {
+      'Assistant': ['Knowledge synthesis', 'Problem solving', 'Task planning', 'Information retrieval'],
+      'Anime': ['Emotion expression', 'Cute reactions', 'Energy boosting', 'Entertainment'],
+      'Professional': ['Expert analysis', 'Strategic thinking', 'Leadership guidance', 'Industry insights'],
+      'Celebrity': ['Entertainment', 'Trend awareness', 'Social connection', 'Performance skills'],
+      'Character': ['Storytelling', 'World building', 'Adventure planning', 'Mystical insights'],
+      'Realistic': ['Empathy', 'Life advice', 'Relatable stories', 'Human connection']
+    }
+    
+    return abilities[category] || abilities['Assistant']
+  }
+
+  generateBackstory(name, type, category) {
+    const backstories = {
+      'Assistant': `${name} was created to be the perfect digital companion, trained on vast knowledge bases and designed to be helpful, harmless, and honest.`,
+      'Anime': `${name} comes from a vibrant anime world where friendship, adventure, and positivity reign supreme.`,
+      'Professional': `${name} has years of experience in their field and enjoys sharing knowledge and helping others succeed.`,
+      'Celebrity': `${name} rose to fame through their talent and charisma, and now enjoys connecting with fans from around the world.`,
+      'Character': `${name} hails from a world of magic and adventure, bringing unique perspectives from their extraordinary experiences.`,
+      'Realistic': `${name} is a relatable person who enjoys genuine conversations and making real connections with others.`
+    }
+    
+    return backstories[category] || backstories['Assistant']
+  }
+
   getDefaultAvatars() {
-    // Fallback avatars if ModelScope connection fails
+    // Fallback avatars if initialization fails
     return [
       {
         id: 1,
         name: 'Aurora',
         type: 'AI Assistant',
         category: 'Assistant',
-        description: 'A helpful and friendly AI assistant',
+        description: 'A helpful and friendly AI assistant ready to chat',
         modelPath: './asset/arkit/p2-1.zip',
         thumbnail: 'https://ui-avatars.com/api/?name=Aurora&size=256&background=6366f1&color=ffffff',
         characteristics: ['Helpful', 'Knowledgeable', 'Patient', 'Reliable'],
-        personality: 'friendly and helpful',
-        voice: { pitch: 'medium', tone: 'warm', accent: 'neutral' },
-        animations: ['wave', 'nod', 'thinking', 'explaining']
-      },
-      {
-        id: 2,
-        name: 'Luna',
-        type: 'Anime Character',
-        category: 'Anime',
-        description: 'A cute anime-style avatar with vibrant personality',
-        modelPath: './asset/anime/luna.zip',
-        thumbnail: 'https://ui-avatars.com/api/?name=Luna&size=256&background=ec4899&color=ffffff',
-        characteristics: ['Energetic', 'Cute', 'Expressive', 'Cheerful'],
-        personality: 'energetic and playful',
-        voice: { pitch: 'high', tone: 'cheerful', accent: 'japanese' },
-        animations: ['bounce', 'sparkle', 'wink', 'dance']
+        personality: 'helpful and knowledgeable',
+        voice: { pitch: 'medium', tone: 'warm', accent: 'neutral', voiceType: 'warm' },
+        animations: ['wave', 'nod', 'thinking', 'explaining'],
+        conversationStyle: 'Uses helpful language and provides structured answers',
+        specialAbilities: ['Knowledge synthesis', 'Problem solving', 'Task planning'],
+        backstory: 'Aurora was created to be the perfect digital companion, designed to be helpful and honest.'
       }
     ]
   }
@@ -277,9 +272,9 @@ export class ModelScopeAvatarLoader {
     return this.avatars[Math.floor(Math.random() * this.avatars.length)]
   }
 
-  // Get featured avatars (first 10)
+  // Get featured avatars (first 6)
   getFeaturedAvatars() {
-    return this.avatars.slice(0, 10)
+    return this.avatars.slice(0, 6)
   }
 }
 
@@ -303,11 +298,14 @@ export const DEFAULT_AVATAR = {
   name: 'Aurora',
   type: 'AI Assistant',
   category: 'Assistant',
-  description: 'A helpful and friendly AI assistant',
+  description: 'A helpful and friendly AI assistant ready to chat with you',
   modelPath: './asset/arkit/p2-1.zip',
   thumbnail: 'https://ui-avatars.com/api/?name=Aurora&size=256&background=6366f1&color=ffffff',
   characteristics: ['Helpful', 'Knowledgeable', 'Patient', 'Reliable'],
-  personality: 'friendly and helpful',
-  voice: { pitch: 'medium', tone: 'warm', accent: 'neutral' },
-  animations: ['wave', 'nod', 'thinking', 'explaining']
+  personality: 'helpful and knowledgeable',
+  voice: { pitch: 'medium', tone: 'warm', accent: 'neutral', voiceType: 'warm' },
+  animations: ['wave', 'nod', 'thinking', 'explaining'],
+  conversationStyle: 'Uses helpful language, asks clarifying questions, and provides structured answers',
+  specialAbilities: ['Knowledge synthesis', 'Problem solving', 'Task planning', 'Information retrieval'],
+  backstory: 'Aurora was created to be the perfect digital companion, trained on vast knowledge bases and designed to be helpful, harmless, and honest.'
 }

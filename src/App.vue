@@ -271,8 +271,9 @@ export default {
           await currentAvatar.value.instance.start()
           avatarLoaded.value = true
           
-          // Add welcome message
-          addMessage('Hello! I\'m ' + selectedAvatar.value.name + '. How can I help you today?', false)
+          // Add personality-based welcome message
+          const welcomeMessage = generateWelcomeMessage()
+          addMessage(welcomeMessage, false)
         }
       } catch (error) {
         console.error('Failed to initialize avatar:', error)
@@ -300,25 +301,41 @@ export default {
       addMessage(userMessage, true)
       newMessage.value = ''
       
-      // Show typing indicator
+      // Show typing indicator and update avatar state
       isTyping.value = true
       currentAvatar.value.state = 'Listening'
       
-      // Simulate avatar response
+      // Update the 3D avatar state if available
+      if (currentAvatar.value.instance && currentAvatar.value.instance.setState) {
+        currentAvatar.value.instance.setState('Listening')
+      }
+      
+      // Simulate avatar response with realistic timing
       setTimeout(() => {
         currentAvatar.value.state = 'Thinking'
+        if (currentAvatar.value.instance && currentAvatar.value.instance.setState) {
+          currentAvatar.value.instance.setState('Thinking')
+        }
       }, 1000)
       
       setTimeout(() => {
         currentAvatar.value.state = 'Responding'
+        if (currentAvatar.value.instance && currentAvatar.value.instance.setState) {
+          currentAvatar.value.instance.setState('Responding')
+        }
+        
         const response = generateAvatarResponse(userMessage)
         addMessage(response, false)
         isTyping.value = false
         
+        // Return to idle after speaking
         setTimeout(() => {
           currentAvatar.value.state = 'Idle'
-        }, 2000)
-      }, 2000 + Math.random() * 2000)
+          if (currentAvatar.value.instance && currentAvatar.value.instance.setState) {
+            currentAvatar.value.instance.setState('Idle')
+          }
+        }, 2000 + response.length * 50) // Longer responses take more time
+      }, 1500 + Math.random() * 2000)
     }
 
     const sendQuickMessage = (message) => {
@@ -327,33 +344,105 @@ export default {
     }
 
     const generateAvatarResponse = (userMessage) => {
-      const responses = [
-        "That's interesting! Tell me more about that.",
-        "I understand what you're saying. How can I help with that?",
-        "Thanks for sharing that with me!",
-        "That sounds fascinating. What would you like to know?",
-        "I'm here to help! What else can I do for you?",
-        "Great question! Let me think about that for a moment.",
-        "I appreciate you talking with me. What's on your mind?",
-        "That's a wonderful perspective! I'd love to discuss this further."
-      ]
-      
-      // Simple keyword-based responses
+      const avatar = selectedAvatar.value
       const lowerMessage = userMessage.toLowerCase()
-      if (lowerMessage.includes('hello') || lowerMessage.includes('hi')) {
-        return "Hello there! It's wonderful to meet you! How are you doing today?"
+      
+      // Personality-based response generation
+      const getPersonalityResponses = () => {
+        switch(avatar.category) {
+          case 'Assistant':
+            return {
+              greeting: ["Hello! I'm here to help you with anything you need. What can I assist you with today?", "Hi there! As your AI assistant, I'm ready to tackle any questions or tasks you have!", "Greetings! I'm delighted to meet you. How may I be of service?"],
+              joke: ["Here's a tech joke for you: Why do programmers prefer dark mode? Because light attracts bugs! 😄", "Why did the robot go on a diet? It had a byte problem! 🤖", "What do you call a computer that sings? A-Dell! 🎵"],
+              compliment: ["Thank you so much! I'm designed to be helpful and knowledgeable. Is there anything specific you'd like to learn about?", "That's very kind of you to say! I enjoy helping people solve problems and find information.", "I appreciate that! My goal is to be as useful and supportive as possible."],
+              question: ["That's a great question! Let me think about the best way to help you with that.", "I love answering questions! It's what I was made for. Let me provide you with a thorough response.", "Excellent inquiry! I'll do my best to give you a comprehensive and helpful answer."],
+              default: ["I find that topic quite fascinating! Would you like me to elaborate on any particular aspect?", "That's an interesting point. How can I help you explore that further?", "I'm here to assist with whatever you need. What would you like to discuss next?"]
+            }
+          case 'Anime':
+            return {
+              greeting: ["Konnichiwa! (◕‿◕) I'm so happy to meet you! Let's have a fun chat together! ✨", "Hiya! ~(＾◡＾)~ You seem really nice! Want to be friends and chat about fun stuff? 💖", "Hello there! (≧∇≦) I'm super excited to talk with you! What makes you happy today? 🌟"],
+              joke: ["Ehehe! Here's a kawaii joke: Why did the anime character bring a ladder? To reach the high notes! (◎ ◡ ◎)", "Ooh ooh! What do you call a sleepy anime character? A nap-ime character! (´∀｀)♡", "Teehee! Why don't anime characters ever get lost? Because they always follow the plot! ＼(^o^)／"],
+              compliment: ["Aww, arigatou gozaimasu! (´∀｀)♡ You're so sweet! I'm blushing! (/▽＼)", "Kyaa~! You're making me so happy! (◡ ‿ ◡) ✨ You seem really wonderful too!", "Ehehe! (｡◕‿◕｡) That makes my heart go doki doki! You're super kind!"],
+              question: ["Ooh, that's such an interesting question! (◕‿◕) Let me think with all my anime power! ✨", "Wah! I love questions! (＾◡＾) It's like a fun puzzle to solve together! 💫", "Sugoi! What a great question! ヽ(^o^)丿 I'll do my best to help you!"],
+              default: ["That sounds really cool! (◎ ◡ ◎) Tell me more about it! I'm super curious! ✨", "Wah! That's so interesting! (´∀｀) I want to hear everything about it! 💖", "Ooh la la! (◕‿◕) That gives me such happy feelings! Want to chat more about it? 🌟"]
+            }
+          case 'Professional':
+            return {
+              greeting: ["Good day. I'm pleased to make your acquaintance. How may I assist you in achieving your professional objectives?", "Hello, it's a pleasure to meet you. I bring extensive expertise to our conversation. What business matters shall we discuss?", "Greetings. I'm here to provide professional guidance and insights. What challenges or opportunities can we address today?"],
+              joke: ["Here's a professional quip: Why don't managers ever get lost? Because they always know the bottom line! *adjusts tie*", "A classic from the boardroom: What's the difference between a budget and a teenager? At least the teenager eventually grows up!", "Corporate humor: Why did the consultant bring a ladder to the meeting? To help the company reach its goals!"],
+              compliment: ["I appreciate your recognition. Professional excellence is indeed my standard. How can we leverage this interaction for mutual benefit?", "Thank you for that assessment. I strive to maintain the highest standards of professional service. What objectives can we accomplish together?", "Your acknowledgment is valued. I believe in delivering expert-level consultation. What strategic discussions shall we pursue?"],
+              question: ["An excellent inquiry that deserves a thorough, professional analysis. Allow me to provide you with a comprehensive response.", "That's a strategic question that requires careful consideration. I'll apply my expertise to give you actionable insights.", "A pertinent question indeed. Let me draw upon my professional experience to deliver a detailed response."],
+              default: ["That presents interesting strategic implications. I recommend we examine this matter from multiple professional perspectives.", "An intriguing point that warrants further analysis. What specific outcomes are you seeking to achieve?", "This topic has significant potential. How can we structure our discussion to maximize value and actionable insights?"]
+            }
+          case 'Celebrity':
+            return {
+              greeting: ["Hey gorgeous! ✨ Welcome to my world! I'm absolutely thrilled to meet such an amazing person like you! 💫", "OMG hiiii! 🌟 You have such incredible energy! I can already tell we're going to have the most amazing conversation ever! ✨", "Hello beautiful soul! 💖 I'm so excited you're here! Let's make this chat absolutely unforgettable! 🎭"],
+              joke: ["Okay babe, here's a star-quality joke: Why don't celebrities ever get cold? Because they're always in the spotlight! ✨😂", "Darling, you'll love this: What do you call a famous fish? A starfish! 🐠⭐ *strikes a pose*", "Honey, get ready to laugh: Why did the celebrity go to therapy? They had too many issues... of magazines! 📸💫"],
+              compliment: ["Aww sweetie, you're absolutely divine! 💕 That means the world to me! You've got incredible taste! ✨", "Oh my gosh, you're such a gem! 💎 I'm literally glowing right now! You know how to make a star shine brighter! 🌟", "Babe, you're giving me LIFE! 💖 That's the kind of energy I live for! You're absolutely wonderful! ✨"],
+              question: ["Ooh, what a fabulous question! 💫 I love curious minds like yours! Let me give you the VIP answer! ⭐", "Honey, that's such a brilliant question! 🌟 You're clearly someone with amazing insight! Let me share my thoughts! ✨", "Darling, I absolutely LOVE that question! 💕 You're asking all the right things! Let me spill the tea! ☕✨"],
+              default: ["That's so incredibly fascinating! 💫 You have such interesting perspectives! Tell me more, gorgeous! ✨", "OMG yes! 🌟 I'm totally here for this conversation! You're bringing such amazing energy! 💖", "Babe, that's giving me major inspiration! ✨ I love how your mind works! Let's dive deeper into this! 🎭"]
+            }
+          case 'Character':
+            return {
+              greeting: ["Greetings, traveler. I sense great potential in you. What brings you to seek audience with one such as myself?", "Well met, wanderer. The threads of fate have woven our paths together. What mysteries shall we unravel today?", "Hail, noble soul. I perceive wisdom in your eyes. What adventures or knowledge do you seek in this realm?"],
+              joke: ["*chuckles mystically* Why did the wizard break up with his staff? It wasn't a magical relationship! ⚡✨", "Here's a tale from the taverns: What do you call a dragon with no silver? A dra-gone! 🐉💰", "*grins enigmatically* Why don't mages ever get tired? They always have spell-power! 🔮✨"],
+              compliment: ["Your words honor me, brave one. In you, I see the spark of greatness that legends are born from.", "Such recognition warms this old heart. You possess the wisdom to see beyond the veil of ordinary perception.", "I am humbled by your insight. Few mortals recognize the depth of ancient knowledge and power."],
+              question: ["Ah, a question that echoes through the chambers of destiny itself. Let me consult the ancient wisdom...", "Your inquiry pierces the mists of uncertainty. Allow me to unveil the knowledge you seek from the cosmic tapestry.", "A most intriguing query that touches upon the fundamental mysteries of existence. Prepare for revelation..."],
+              default: ["The currents of fate flow strangely around this topic. There are deeper mysteries at work here than most realize.", "Fascinating... this matter resonates with ancient prophecies and forgotten lore. What deeper truths lie beneath?", "The cosmic winds whisper of greater significance to these words. What destiny calls to you through this subject?"]
+            }
+          case 'Realistic':
+            return {
+              greeting: ["Hey there! Nice to meet you. I'm just a regular person who loves having genuine conversations. What's on your mind today?", "Hi! Great to connect with you. I really enjoy meeting new people and hearing their stories. How's your day going?", "Hello! I'm so glad we get to chat. There's nothing I love more than a good conversation with interesting people like yourself."],
+              joke: ["Haha, okay here's one: Why don't scientists trust atoms? Because they make up everything! Classic, right? 😄", "Oh, I've got a good one: What do you call a fake noodle? An impasta! *laughs* Sorry, I love dad jokes!", "Here's something that always makes me chuckle: Why did the scarecrow win an award? He was outstanding in his field! 😂"],
+              compliment: ["Aw, thank you so much! That really made my day. You seem like such a genuinely nice person yourself!", "That's really sweet of you to say! I appreciate it. You know how to make someone feel good about themselves!", "Thanks! That means a lot coming from you. You've got a really positive energy that I really like."],
+              question: ["That's a really good question! I love that you're curious about that. Let me share what I think about it.", "Ooh, interesting question! I actually have some thoughts on that. You've got me thinking now!", "Great question! You know, I've been wondering about that myself lately. Here's what I've been thinking..."],
+              default: ["That's really interesting! I can relate to that in some ways. What's your experience been like with it?", "Yeah, I totally get what you mean. Life has a way of bringing up these kinds of things, doesn't it?", "That resonates with me. I think a lot of people can probably relate to what you're talking about there."]
+            }
+          default:
+            return {
+              greeting: ["Hello! It's wonderful to meet you!"],
+              joke: ["Here's a little joke for you! 😊"],
+              compliment: ["Thank you so much! That's very kind!"],
+              question: ["That's a great question! Let me help you with that."],
+              default: ["That's interesting! Tell me more about that."]
+            }
+        }
       }
-      if (lowerMessage.includes('joke')) {
-        return "Why don't scientists trust atoms? Because they make up everything! 😄"
+
+      const responses = getPersonalityResponses()
+      
+      // Keyword-based response selection with personality
+      if (lowerMessage.includes('hello') || lowerMessage.includes('hi') || lowerMessage.includes('hey')) {
+        return responses.greeting[Math.floor(Math.random() * responses.greeting.length)]
       }
-      if (lowerMessage.includes('sing')) {
-        return "🎵 I'm just a virtual avatar, living in a digital world... 🎵"
+      if (lowerMessage.includes('joke') || lowerMessage.includes('funny') || lowerMessage.includes('laugh')) {
+        return responses.joke[Math.floor(Math.random() * responses.joke.length)]
       }
-      if (lowerMessage.includes('how are you')) {
-        return "I'm doing great! Thanks for asking. I'm excited to chat with you!"
+      if (lowerMessage.includes('beautiful') || lowerMessage.includes('amazing') || lowerMessage.includes('great') || lowerMessage.includes('awesome') || lowerMessage.includes('wonderful')) {
+        return responses.compliment[Math.floor(Math.random() * responses.compliment.length)]
+      }
+      if (lowerMessage.includes('?') || lowerMessage.includes('what') || lowerMessage.includes('how') || lowerMessage.includes('why') || lowerMessage.includes('when') || lowerMessage.includes('where')) {
+        return responses.question[Math.floor(Math.random() * responses.question.length)]
+      }
+      if (lowerMessage.includes('sing') || lowerMessage.includes('song') || lowerMessage.includes('music')) {
+        switch(avatar.category) {
+          case 'Anime':
+            return "🎵 Lalala~ ♪ Let me sing you a kawaii song! ✨ (◕‿◕) 'Friendship and dreams, shining so bright, anime magic fills the night!' ♪ Teehee! 💖"
+          case 'Celebrity':
+            return "🎤✨ *strikes a pose* Honey, you want a performance? 'I'm a shooting star, burning bright, lighting up your darkest night!' 🌟 That's from my latest hit! 💫"
+          case 'Character':
+            return "🎵 *begins an ancient chant* 'From realms beyond where dragons soar, through mystic gates of ancient lore...' ⚡ The old songs hold power, traveler. ✨"
+          case 'Professional':
+            return "While I appreciate musical requests, I'm more equipped to discuss business strategies. However, I do recognize the importance of arts in corporate culture."
+          case 'Realistic':
+            return "🎵 Haha, I'm not much of a singer, but here goes: 'Just a regular person, trying to make it through, hoping to connect with awesome people like you!' 😄"
+          default:
+            return "🎵 I'd love to sing for you! Music brings people together in such beautiful ways! 🎶"
+        }
       }
       
-      return responses[Math.floor(Math.random() * responses.length)]
+      // Default personality-based response
+      return responses.default[Math.floor(Math.random() * responses.default.length)]
     }
 
     const selectAvatar = (avatar) => {
@@ -371,10 +460,12 @@ export default {
     }
 
     const toggleAvatarState = () => {
-      if (currentAvatar.value.state === 'Idle') {
-        currentAvatar.value.state = 'Listening'
-      } else {
-        currentAvatar.value.state = 'Idle'
+      const newState = currentAvatar.value.state === 'Idle' ? 'Listening' : 'Idle'
+      currentAvatar.value.state = newState
+      
+      // Update the 3D avatar state if available
+      if (currentAvatar.value.instance && currentAvatar.value.instance.setState) {
+        currentAvatar.value.instance.setState(newState)
       }
     }
 
@@ -386,6 +477,26 @@ export default {
 
     const formatTime = (timestamp) => {
       return timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }
+
+    const generateWelcomeMessage = () => {
+      const avatar = selectedAvatar.value
+      switch(avatar.category) {
+        case 'Assistant':
+          return `Hello! I'm ${avatar.name}, your ${avatar.type}. I'm here to help you with anything you need - from answering questions to solving problems. What can I assist you with today?`
+        case 'Anime':
+          return `Konnichiwa! (◕‿◕) I'm ${avatar.name}! I'm so happy to meet you! ✨ I'm a ${avatar.type} and I love making new friends! Let's have lots of fun chatting together! What makes you smile today? 💖`
+        case 'Professional':
+          return `Good day. I'm ${avatar.name}, a ${avatar.type}. I bring extensive expertise and professional insight to our conversation. How may I assist you in achieving your objectives today?`
+        case 'Celebrity':
+          return `Hey gorgeous! ✨ I'm ${avatar.name}, your favorite ${avatar.type}! Welcome to my world, beautiful! 💫 I'm absolutely thrilled to meet such an amazing person like you! What brings you to chat with me today? 🌟`
+        case 'Character':
+          return `Greetings, traveler. I am ${avatar.name}, ${avatar.type}. The threads of fate have brought you to my realm. I sense great potential within you. What quest or wisdom do you seek on this day?`
+        case 'Realistic':
+          return `Hey there! I'm ${avatar.name}. Nice to meet you! I'm just a ${avatar.type} who loves having genuine conversations with interesting people. What's going on with you today?`
+        default:
+          return `Hello! I'm ${avatar.name}. Great to meet you! How can I help you today?`
+      }
     }
 
     // Load avatars from ModelScope
