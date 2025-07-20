@@ -1,6 +1,9 @@
 // Vercel Serverless Function for AI Conversation Pipeline
 import OpenAI from 'openai';
 
+// Session storage for conversation context
+const conversations = new Map();
+
 // Simple VAD using energy-based detection
 function detectSpeechActivity(audioArray, sampleRate = 16000) {
   const frameLength = Math.floor(0.025 * sampleRate); // 25ms frames
@@ -91,13 +94,12 @@ function generateSimpleLAMExpressions(text, audioDuration) {
   return expressions;
 }
 
-// In-memory conversation storage
-const conversations = new Map();
-
 export default async function handler(req, res) {
+  console.log('🚀 AI Conversation endpoint called');
+  
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   
   if (req.method === 'OPTIONS') {
@@ -109,41 +111,43 @@ export default async function handler(req, res) {
   }
   
   try {
-    const { audio_data, sample_rate = 16000, session_id = 'default' } = req.body;
-    
-    console.log('🎯 Processing conversation request:', { 
-      hasAudio: !!audio_data, 
-      sessionId: session_id,
-      sampleRate: sample_rate,
-      audioLength: audio_data ? audio_data.length : 0
-    });
+    const { audio_data, sample_rate, session_id } = req.body;
     
     if (!audio_data) {
       return res.status(400).json({ error: 'No audio data provided' });
     }
     
-    if (!process.env.OPENAI_API_KEY) {
-      console.error('❌ OpenAI API key not found in environment');
-      return res.status(500).json({ error: 'OpenAI API key not configured' });
-    }
-    
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+    console.log('📋 Request received:', {
+      audioDataLength: audio_data.length,
+      sampleRate: sample_rate,
+      sessionId: session_id
     });
-    
-    // Decode base64 audio
-    let audioBuffer, audioArray;
+
+    // **NEW APPROACH**: Stream-process audio instead of loading all at once
+    let audioArray;
     try {
-      console.log('🔍 Decoding audio data, length:', audio_data.length);
-      audioBuffer = Buffer.from(audio_data, 'base64');
+      console.log('🔍 Stream-processing audio data...');
+      
+      // Decode base64 in smaller chunks to avoid stack overflow
+      const chunkSize = 1024 * 1024; // 1MB chunks
+      const audioChunks = [];
+      
+      for (let i = 0; i < audio_data.length; i += chunkSize) {
+        const chunk = audio_data.slice(i, i + chunkSize);
+        const decodedChunk = Buffer.from(chunk, 'base64');
+        audioChunks.push(decodedChunk);
+      }
+      
+      // Combine chunks
+      const totalLength = audioChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+      const audioBuffer = Buffer.concat(audioChunks, totalLength);
       
       console.log('🔍 Audio buffer created:', {
-        bufferLength: audioBuffer.length,
-        bufferType: typeof audioBuffer,
-        isBuffer: Buffer.isBuffer(audioBuffer)
+        totalLength,
+        chunks: audioChunks.length
       });
       
-      // Check if buffer is valid for Float32Array conversion
+      // Convert to Float32Array safely
       if (audioBuffer.length % 4 !== 0) {
         console.error('❌ Audio buffer length not divisible by 4:', audioBuffer.length);
         return res.status(400).json({ 
@@ -152,61 +156,65 @@ export default async function handler(req, res) {
         });
       }
       
-      audioArray = new Float32Array(audioBuffer.buffer, audioBuffer.byteOffset, audioBuffer.length / 4);
+      // Process in smaller chunks to avoid stack overflow
+      const floatArrayLength = audioBuffer.length / 4;
+      audioArray = new Float32Array(floatArrayLength);
       
-      console.log('🎵 Audio processed:', {
-        bufferSize: audioBuffer.length,
-        arrayLength: audioArray.length,
-        maxAmplitude: audioArray.length > 0 ? Math.max(...audioArray.map(Math.abs)) : 0,
-        minAmplitude: audioArray.length > 0 ? Math.min(...audioArray.map(Math.abs)) : 0
-      });
-      
-      // Validate audio array
-      if (audioArray.length === 0) {
-        console.error('❌ Audio array is empty');
-        return res.status(400).json({ error: 'Audio array is empty after conversion' });
+      // Fill array in chunks
+      const processChunkSize = 8192; // Process 8K floats at a time
+      for (let i = 0; i < floatArrayLength; i += processChunkSize) {
+        const endIndex = Math.min(i + processChunkSize, floatArrayLength);
+        const chunkBuffer = audioBuffer.slice(i * 4, endIndex * 4);
+        const chunkArray = new Float32Array(chunkBuffer.buffer, chunkBuffer.byteOffset, chunkBuffer.length / 4);
+        audioArray.set(chunkArray, i);
       }
       
-      // Check for reasonable audio values
-      const maxAmp = Math.max(...audioArray.map(Math.abs));
-      if (maxAmp === 0) {
-        console.error('❌ Audio appears to be silent (all zeros)');
-        return res.status(400).json({ error: 'Audio data appears to be silent' });
+      console.log('🎵 Audio processed successfully:', {
+        arrayLength: audioArray.length,
+        maxAmplitude: audioArray.length > 0 ? Math.max(...Array.from(audioArray.slice(0, 1000)).map(Math.abs)) : 0
+      });
+      
+      if (audioArray.length === 0) {
+        return res.status(400).json({ error: 'Audio array is empty after conversion' });
       }
       
     } catch (decodeError) {
       console.error('❌ Audio decode error:', decodeError);
       return res.status(400).json({ 
-        error: 'Invalid audio data format', 
+        error: 'Audio processing failed', 
         details: decodeError.message,
         audioDataLength: audio_data?.length || 0
       });
     }
-    
-    // Step 1: VAD - Voice Activity Detection
-    const speechSegments = detectSpeechActivity(audioArray, sample_rate);
-    console.log('🎤 Speech segments detected:', speechSegments.length);
-    
-    if (speechSegments.length === 0) {
-      return res.status(200).json({
-        success: false,
-        message: 'No speech detected',
-        debug: { audioLength: audioArray.length, maxAmplitude: Math.max(...audioArray.map(Math.abs)) }
-      });
+
+    // Initialize OpenAI
+    if (!process.env.OPENAI_API_KEY) {
+      console.error('❌ OpenAI API key not found in environment');
+      return res.status(500).json({ error: 'OpenAI API key not configured' });
     }
     
-    // Use the longest speech segment
-    const [start, end] = speechSegments.reduce((longest, current) => 
-      (current[1] - current[0]) > (longest[1] - longest[0]) ? current : longest
-    );
-    const speechAudio = audioArray.slice(start, end);
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+
+    // Step 1: VAD - Voice Activity Detection (simplified)
+    const energy = audioArray.reduce((sum, val) => sum + val * val, 0) / audioArray.length;
+    const hasVoice = energy > 0.001; // Simple energy threshold
     
-    console.log('🗣️ Using speech segment:', { start, end, duration: (end - start) / sample_rate });
+    console.log('🔊 VAD result:', { energy, hasVoice });
+    
+    if (!hasVoice) {
+      return res.status(200).json({
+        success: true,
+        message: 'No voice detected',
+        has_voice: false
+      });
+    }
     
     // Step 2: ASR - Whisper Transcription (FIXED)
     try {
       // Create WAV file buffer for Whisper
-      const speechLength = speechAudio.length;
+      const speechLength = audioArray.length; // Use the full audio array for transcription
       const wavBuffer = Buffer.alloc(speechLength * 2 + 44);
       
       // WAV header
@@ -226,7 +234,7 @@ export default async function handler(req, res) {
       
       // Convert float32 to int16
       for (let i = 0; i < speechLength; i++) {
-        const sample = Math.max(-1, Math.min(1, speechAudio[i]));
+        const sample = Math.max(-1, Math.min(1, audioArray[i])); // Use audioArray directly
         wavBuffer.writeInt16LE(sample * 32767, 44 + i * 2);
       }
       
@@ -319,8 +327,8 @@ export default async function handler(req, res) {
         audio_duration: audioDuration,
         lam_expressions: lamExpressions,
         processing_info: {
-          speech_segments: speechSegments.length,
-          speech_duration: speechAudio.length / sample_rate,
+          speech_segments: 1, // Simplified VAD
+          speech_duration: audioArray.length / sample_rate,
           response_duration: audioDuration,
           expression_frames: lamExpressions.length
         }
