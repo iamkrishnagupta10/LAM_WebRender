@@ -1,28 +1,9 @@
-import { createApp } from 'vue'
-import App from './App.vue'
-import { modelScopeAvatars } from './modelScopeAvatars.js'
-import './style.css'
+import { GaussianAvatar } from './gaussianAvatar';
 
-// Initialize the ModelScope avatar gallery
-async function initializeApp() {
-  try {
-    // Load the 100 avatars from ModelScope
-    await modelScopeAvatars.initialize()
-    console.log('Avatar gallery loaded successfully!')
-    
-    // Create and mount the Vue application
-    const app = createApp(App)
-    app.mount('#app')
-    
-    console.log('Avatar Chat Application started!')
-  } catch (error) {
-    console.error('Failed to initialize application:', error)
-    
-    // Still mount the app with default avatars
-    const app = createApp(App)
-    app.mount('#app')
-  }
+const div = document.getElementById('LAM_WebRender') as HTMLDivElement;
+const assetPath = './asset/arkit/p2-1.zip';
+
+if (div) {
+  const gaussianAvatar = new GaussianAvatar(div, assetPath);
+  gaussianAvatar.start();
 }
-
-// Start the application
-initializeApp()

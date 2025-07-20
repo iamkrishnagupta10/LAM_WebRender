@@ -4,24 +4,18 @@
     "version": "0.0.0",
     "type": "module",
     "scripts": {
-        "dev": "vite",
-        "build": "tsc && vite build",
-        "preview": "vite preview"
+      "dev": "vite",
+      "build": "tsc && vite build",
+      "preview": "vite preview"
     },
     "devDependencies": {
-        "@types/node": "^24.0.15",
-        "@vitejs/plugin-vue": "^5.1.3",
-        "tslib": "^2.8.1",
-        "typescript": "^5.0.0",
-        "vite": "^5.1.6",
-        "vue-tsc": "^2.1.4"
+      "vite": "^5.1.6",
+      "typescript": "^5.0.0",
+      "tslib": "^2.8.1",
+      "@types/node": "^22.10.6"
     },
     "dependencies": {
-        "@heroicons/vue": "^2.0.18",
-        "@types/uuid": "^9.0.7",
-        "gaussian-splat-renderer-for-lam": "0.0.8",
-        "uuid": "^9.0.1",
-        "vue": "^3.4.0"
+        "gaussian-splat-renderer-for-lam":"0.0.8"
     },
     "repository": "https://github.com/aigc3d/LAM_WebRender"
-}
+  }

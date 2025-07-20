@@ -33,87 +33,16 @@ export class GaussianAvatar {
       },
     );
     this.startTime = performance.now() / 1000;
-    
-    // Make the avatar more alive with natural state transitions
-    this.startIdleAnimations();
-  }
+    setTimeout(() => {
+      this.curState = "Listening"
+    }, 5000);
+    setTimeout(() => {
+      this.curState = "Thinking"
+    }, 6000);
+    setTimeout(() => {
+      this.curState = "Responding"
+    }, 10000);
 
-  private startIdleAnimations() {
-    // Natural breathing and blinking animations
-    setInterval(() => {
-      if (this.curState === "Idle") {
-        // Add subtle breathing animation
-        this.addBreathingExpression();
-      }
-    }, 3000);
-
-    // Random blinking
-    setInterval(() => {
-      this.addBlinkExpression();
-    }, 2000 + Math.random() * 3000);
-
-    // Occasional head movements when idle
-    setInterval(() => {
-      if (this.curState === "Idle") {
-        this.addSubtleHeadMovement();
-      }
-    }, 5000 + Math.random() * 5000);
-  }
-
-  private addBreathingExpression() {
-    // Subtle breathing motion (simulated)
-    console.log('Adding breathing animation for liveliness');
-  }
-
-  private addBlinkExpression() {
-    // Natural blinking animation
-    console.log('Avatar blinks naturally');
-  }
-
-  private addSubtleHeadMovement() {
-    // Slight head movement for aliveness
-    console.log('Subtle head movement to show avatar is alive');
-  }
-
-  public setState(newState: string) {
-    this.curState = newState;
-    console.log(`Avatar state changed to: ${newState}`);
-    
-    // Add state-specific animations
-    switch(newState) {
-      case "Listening":
-        this.addListeningExpression();
-        break;
-      case "Thinking":
-        this.addThinkingExpression();
-        break;
-      case "Responding":
-        this.addRespondingExpression();
-        break;
-      case "Idle":
-        this.addIdleExpression();
-        break;
-    }
-  }
-
-  private addListeningExpression() {
-    // Attentive expression - slightly raised eyebrows, focused eyes
-    console.log('Avatar shows listening expression');
-  }
-
-  private addThinkingExpression() {
-    // Thoughtful expression - slight frown, looking up or to the side
-    console.log('Avatar shows thinking expression');
-  }
-
-  private addRespondingExpression() {
-    // Speaking expression - open mouth, animated face
-    console.log('Avatar shows speaking expression');
-  }
-
-  private addIdleExpression() {
-    // Relaxed, neutral expression
-    console.log('Avatar returns to idle expression');
   }
   expressitionData: any;
   startTime = 0
