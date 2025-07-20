@@ -17,7 +17,7 @@
     },
     "dependencies": {
         "gaussian-splat-renderer-for-lam": "0.0.8",
-        "openai": "^4.20.1"
+        "openai": "^4.104.0"
     },
     "repository": "https://github.com/aigc3d/LAM_WebRender"
 }
