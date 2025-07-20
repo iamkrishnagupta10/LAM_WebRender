@@ -493,6 +493,9 @@ async function processRecordedAudio() {
     // Encode to base64
     const audioBase64 = base64EncodeArray(audioArray);
     
+    debugLog(`📡 Audio data prepared: ${audioBase64.length} chars, RMS: ${rms.toFixed(4)}`);
+    debugLog(`🎵 Audio details: ${audioArray.length} samples, ${audioBuffer.sampleRate}Hz`);
+    
     updateStatus('🧠 AI is thinking...');
     debugLog('📡 Sending to AI server...');
     
@@ -501,22 +504,28 @@ async function processRecordedAudio() {
     }
     
     // Send to AI conversation pipeline
+    const requestBody = {
+      audio_data: audioBase64,
+      sample_rate: audioBuffer.sampleRate,
+      session_id: sessionId
+    };
+    
+    debugLog(`📤 Request body: audio_data length=${audioBase64.length}, sample_rate=${audioBuffer.sampleRate}`);
+    
     const response = await fetch(`${AI_SERVER_URL}/conversation`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        audio_data: audioBase64,
-        sample_rate: audioBuffer.sampleRate,
-        session_id: sessionId
-      })
+      body: JSON.stringify(requestBody)
     });
     
     debugLog(`📡 AI response status: ${response.status}`);
     
     if (!response.ok) {
-      throw new Error(`AI server error: ${response.status}`);
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      debugLog(`❌ Server error response: ${JSON.stringify(errorData)}`);
+      throw new Error(`AI server error: ${response.status} - ${errorData.error || 'Unknown'}`);
     }
     
     const data = await response.json();
@@ -624,18 +633,25 @@ function updateStatus(message: string) {
 
 // Utility functions for base64 encoding/decoding of float32 arrays
 function base64EncodeArray(array: Float32Array): string {
-  // Fix for stack overflow - process in chunks instead of all at once
-  const chunkSize = 8192; // Process 8KB chunks
-  let result = '';
-  
-  for (let i = 0; i < array.length; i += chunkSize) {
-    const chunk = array.slice(i, i + chunkSize);
-    const bytes = new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength);
-    const chunkResult = btoa(String.fromCharCode.apply(null, Array.from(bytes)));
-    result += chunkResult;
+  try {
+    // Convert Float32Array to ArrayBuffer then to base64
+    const buffer = array.buffer;
+    const bytes = new Uint8Array(buffer);
+    
+    // Use simpler approach - convert to string in chunks to avoid stack overflow
+    let binaryString = '';
+    const chunkSize = 8192;
+    
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.slice(i, i + chunkSize);
+      binaryString += String.fromCharCode.apply(null, Array.from(chunk));
+    }
+    
+    return btoa(binaryString);
+  } catch (error) {
+    console.error('Error encoding audio to base64:', error);
+    throw new Error('Failed to encode audio data');
   }
-  
-  return result;
 }
 
 function base64DecodeToArray(base64: string): Float32Array {

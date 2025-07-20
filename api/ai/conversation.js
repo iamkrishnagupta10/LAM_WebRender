@@ -134,17 +134,53 @@ export default async function handler(req, res) {
     // Decode base64 audio
     let audioBuffer, audioArray;
     try {
+      console.log('🔍 Decoding audio data, length:', audio_data.length);
       audioBuffer = Buffer.from(audio_data, 'base64');
-      audioArray = new Float32Array(audioBuffer.buffer);
+      
+      console.log('🔍 Audio buffer created:', {
+        bufferLength: audioBuffer.length,
+        bufferType: typeof audioBuffer,
+        isBuffer: Buffer.isBuffer(audioBuffer)
+      });
+      
+      // Check if buffer is valid for Float32Array conversion
+      if (audioBuffer.length % 4 !== 0) {
+        console.error('❌ Audio buffer length not divisible by 4:', audioBuffer.length);
+        return res.status(400).json({ 
+          error: 'Invalid audio data format - buffer length not divisible by 4',
+          bufferLength: audioBuffer.length 
+        });
+      }
+      
+      audioArray = new Float32Array(audioBuffer.buffer, audioBuffer.byteOffset, audioBuffer.length / 4);
       
       console.log('🎵 Audio processed:', {
         bufferSize: audioBuffer.length,
         arrayLength: audioArray.length,
-        maxAmplitude: Math.max(...audioArray.map(Math.abs))
+        maxAmplitude: audioArray.length > 0 ? Math.max(...audioArray.map(Math.abs)) : 0,
+        minAmplitude: audioArray.length > 0 ? Math.min(...audioArray.map(Math.abs)) : 0
       });
+      
+      // Validate audio array
+      if (audioArray.length === 0) {
+        console.error('❌ Audio array is empty');
+        return res.status(400).json({ error: 'Audio array is empty after conversion' });
+      }
+      
+      // Check for reasonable audio values
+      const maxAmp = Math.max(...audioArray.map(Math.abs));
+      if (maxAmp === 0) {
+        console.error('❌ Audio appears to be silent (all zeros)');
+        return res.status(400).json({ error: 'Audio data appears to be silent' });
+      }
+      
     } catch (decodeError) {
       console.error('❌ Audio decode error:', decodeError);
-      return res.status(400).json({ error: 'Invalid audio data format' });
+      return res.status(400).json({ 
+        error: 'Invalid audio data format', 
+        details: decodeError.message,
+        audioDataLength: audio_data?.length || 0
+      });
     }
     
     // Step 1: VAD - Voice Activity Detection
