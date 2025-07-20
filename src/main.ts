@@ -1,6 +1,6 @@
 import { GaussianAvatar } from './gaussianAvatar';
 
-console.log('Starting LAM WebRender with Audio Interaction...');
+console.log('Starting LAM WebRender with LAM_Audio2Expression...');
 
 const div = document.getElementById('LAM_WebRender') as HTMLDivElement;
 const assetPath = '/asset/arkit/p2-1.zip';
@@ -12,6 +12,10 @@ let avatarInstance: GaussianAvatar | null = null;
 let isListening = false;
 let recognition: any = null;
 let audioContext: AudioContext | null = null;
+let sessionId: string = 'session_' + Date.now();
+
+// LAM_Audio2Expression server URL
+const LAM_SERVER_URL = 'http://localhost:5001';
 
 function hideLoadingIndicator() {
   const indicator = document.getElementById('loadingIndicator');
@@ -37,7 +41,7 @@ function addAudioControls() {
       font-family: Arial, sans-serif;
       z-index: 1000;
     ">
-      <div style="margin-bottom: 10px;">🎙️ Voice Interaction</div>
+      <div style="margin-bottom: 10px;">🤖 LAM Audio2Expression</div>
       <button id="micButton" style="
         background: #4CAF50;
         border: none;
@@ -55,9 +59,21 @@ function addAudioControls() {
         margin: 5px;
         border-radius: 5px;
         cursor: pointer;
-      ">Test Voice</button>
+      ">Test LAM TTS</button>
+      <button id="resetButton" style="
+        background: #ff9800;
+        border: none;
+        color: white;
+        padding: 10px 20px;
+        margin: 5px;
+        border-radius: 5px;
+        cursor: pointer;
+      ">Reset Context</button>
       <div id="statusText" style="margin-top: 10px; font-size: 12px;">
-        Click "Start Listening" to begin voice interaction
+        Real LAM_Audio2Expression integration ready
+      </div>
+      <div id="lamStatus" style="margin-top: 5px; font-size: 10px; color: #ccc;">
+        Checking LAM server...
       </div>
     </div>
   `;
@@ -66,7 +82,36 @@ function addAudioControls() {
   
   // Add event listeners
   document.getElementById('micButton')?.addEventListener('click', toggleListening);
-  document.getElementById('speakButton')?.addEventListener('click', testVoice);
+  document.getElementById('speakButton')?.addEventListener('click', testLAMTTS);
+  document.getElementById('resetButton')?.addEventListener('click', resetLAMContext);
+  
+  // Check LAM server status
+  checkLAMServerStatus();
+}
+
+async function checkLAMServerStatus() {
+  try {
+    const response = await fetch(`${LAM_SERVER_URL}/`);
+    const data = await response.json();
+    
+    const lamStatus = document.getElementById('lamStatus');
+    if (lamStatus) {
+      if (data.lam_available && data.engine_ready) {
+        lamStatus.textContent = '✅ LAM_Audio2Expression Ready';
+        lamStatus.style.color = '#4CAF50';
+      } else {
+        lamStatus.textContent = '⚠️ LAM Engine Not Ready';
+        lamStatus.style.color = '#ff9800';
+      }
+    }
+  } catch (error) {
+    console.error('LAM server not available:', error);
+    const lamStatus = document.getElementById('lamStatus');
+    if (lamStatus) {
+      lamStatus.textContent = '❌ LAM Server Offline';
+      lamStatus.style.color = '#f44336';
+    }
+  }
 }
 
 async function initializeAudio() {
@@ -130,7 +175,7 @@ async function initializeAudio() {
     
   } catch (error) {
     console.error('Error initializing audio:', error);
-    updateStatus('Audio not available - text interaction only');
+    updateStatus('Audio not available - LAM TTS only');
   }
 }
 
@@ -171,7 +216,7 @@ function updateStatus(message: string) {
   console.log('Status:', message);
 }
 
-function handleSpeechInput(text: string) {
+async function handleSpeechInput(text: string) {
   console.log('Processing speech input:', text);
   updateStatus(`You said: "${text}"`);
   
@@ -179,10 +224,10 @@ function handleSpeechInput(text: string) {
     avatarInstance.setState('Thinking');
   }
   
-  // Generate response based on speech input
-  setTimeout(() => {
+  // Generate response and use LAM_Audio2Expression
+  setTimeout(async () => {
     const response = generateResponse(text);
-    speakResponse(response);
+    await speakWithLAM(response);
   }, 1000 + Math.random() * 2000);
 }
 
@@ -198,59 +243,114 @@ function generateResponse(input: string): string {
   // Simple keyword responses
   const lowerInput = input.toLowerCase();
   if (lowerInput.includes('hello') || lowerInput.includes('hi')) {
-    return "Hello there! It's wonderful to hear your voice! How are you today?";
+    return "Hello there! It's wonderful to hear your voice with LAM Audio2Expression!";
   }
   if (lowerInput.includes('how are you')) {
-    return "I'm doing great! Thanks for asking with your voice. I love being able to hear and talk with you!";
+    return "I'm doing great! My facial expressions are powered by LAM Audio2Expression technology!";
   }
   if (lowerInput.includes('name')) {
-    return "I'm your AI avatar companion! I can see you, hear you, and respond with voice and expressions!";
+    return "I'm your LAM avatar! My expressions are generated in real-time from audio using AI!";
   }
   
   return responses[Math.floor(Math.random() * responses.length)];
 }
 
-function speakResponse(text: string) {
-  console.log('Speaking response:', text);
+async function speakWithLAM(text: string) {
+  console.log('Speaking with LAM_Audio2Expression:', text);
   updateStatus(`Avatar: "${text}"`);
   
   if (avatarInstance) {
     avatarInstance.setState('Responding');
   }
   
-  // Use Text-to-Speech
-  if ('speechSynthesis' in window) {
+  try {
+    // Send text to LAM_Audio2Expression server
+    const response = await fetch(`${LAM_SERVER_URL}/api/generate_tts_expressions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: text,
+        session_id: sessionId
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`LAM server error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    if (data.success && data.expressions) {
+      console.log('LAM expressions generated:', data.expressions.length, 'frames');
+      updateStatus(`LAM expressions: ${data.expressions.length} frames, ${data.audio_duration.toFixed(2)}s`);
+      
+      // Apply expressions to avatar
+      if (avatarInstance) {
+        avatarInstance.applyLAMExpressions(data.expressions, data.audio_duration);
+      }
+      
+      // Also use browser TTS for audio playback
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.9;
+      utterance.pitch = 1.1;
+      utterance.volume = 0.8;
+      
+      utterance.onend = () => {
+        console.log('Speech ended');
+        if (avatarInstance) {
+          avatarInstance.setState('Idle');
+        }
+        updateStatus('Ready to listen...');
+      };
+      
+      speechSynthesis.speak(utterance);
+      
+    } else {
+      throw new Error('Failed to generate LAM expressions');
+    }
+    
+  } catch (error) {
+    console.error('Error with LAM_Audio2Expression:', error);
+    updateStatus('LAM error - using fallback TTS');
+    
+    // Fallback to regular TTS
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.9;
-    utterance.pitch = 1.1;
-    utterance.volume = 0.8;
-    
-    utterance.onstart = () => {
-      console.log('TTS started');
-    };
-    
     utterance.onend = () => {
-      console.log('TTS ended');
       if (avatarInstance) {
         avatarInstance.setState('Idle');
       }
       updateStatus('Ready to listen...');
     };
-    
     speechSynthesis.speak(utterance);
-  } else {
-    console.warn('Text-to-speech not supported');
-    setTimeout(() => {
-      if (avatarInstance) {
-        avatarInstance.setState('Idle');
-      }
-      updateStatus('Ready to listen...');
-    }, 2000);
   }
 }
 
-function testVoice() {
-  speakResponse("Hello! I can hear you and speak back. Try talking to me with the microphone!");
+async function testLAMTTS() {
+  await speakWithLAM("Hello! This is a test of LAM Audio2Expression. My facial expressions are being generated in real-time from this speech using advanced AI technology!");
+}
+
+async function resetLAMContext() {
+  try {
+    const response = await fetch(`${LAM_SERVER_URL}/api/reset_context`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        session_id: sessionId
+      })
+    });
+    
+    const data = await response.json();
+    updateStatus('LAM context reset');
+    console.log('LAM context reset:', data);
+    
+  } catch (error) {
+    console.error('Error resetting LAM context:', error);
+    updateStatus('Failed to reset LAM context');
+  }
 }
 
 if (div) {

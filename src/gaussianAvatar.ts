@@ -7,6 +7,10 @@ export class GaussianAvatar {
   public curState = "Idle";
   private _renderer!: GaussianSplats3D.GaussianSplatRenderer;
   private bsData: any = null;
+  private lamExpressions: any[] = [];
+  private lamStartTime: number = 0;
+  private lamDuration: number = 0;
+  private useLAMExpressions: boolean = false;
   
   constructor(container: HTMLDivElement, assetsPath: string) {
     console.log('GaussianAvatar constructor called with:', container, assetsPath);
@@ -56,6 +60,8 @@ export class GaussianAvatar {
     switch(state) {
       case "Listening":
         console.log('Triggering listening expression - attentive look');
+        // Reset LAM expressions when starting to listen
+        this.useLAMExpressions = false;
         break;
       case "Thinking":
         console.log('Triggering thinking expression - contemplative look');
@@ -65,8 +71,24 @@ export class GaussianAvatar {
         break;
       case "Idle":
         console.log('Triggering idle expression - relaxed look');
+        // Reset LAM expressions when going idle
+        this.useLAMExpressions = false;
         break;
     }
+  }
+
+  public applyLAMExpressions(expressions: any[], duration: number) {
+    console.log('Applying LAM expressions:', expressions.length, 'frames for', duration, 'seconds');
+    this.lamExpressions = expressions;
+    this.lamDuration = duration;
+    this.lamStartTime = performance.now() / 1000;
+    this.useLAMExpressions = true;
+    
+    // Automatically disable LAM expressions after duration
+    setTimeout(() => {
+      console.log('LAM expressions finished, returning to default');
+      this.useLAMExpressions = false;
+    }, duration * 1000 + 500); // Add small buffer
   }
 
   public async render() {
@@ -94,7 +116,7 @@ export class GaussianAvatar {
       console.log('Animation cycle started at time:', this.startTime);
       
       // Remove the automatic state changes - now controlled by voice interaction
-      console.log('Avatar ready for voice interaction!');
+      console.log('Avatar ready for LAM_Audio2Expression interaction!');
 
     } catch (error) {
       console.error('Error in render method:', error);
@@ -113,7 +135,12 @@ export class GaussianAvatar {
     return this.curState;
   }
   
-  public getArkitFaceFrame() {
+  public getArkitFaceFrame(): any {
+    // Check if we should use LAM expressions instead of default
+    if (this.useLAMExpressions && this.lamExpressions.length > 0) {
+      return this.getLAMExpressionFrame();
+    }
+
     if (!this.bsData) {
       console.warn('Expression data not loaded yet');
       return {};
@@ -136,5 +163,71 @@ export class GaussianAvatar {
     }
     
     return this.expressitionData;
+  }
+
+  private getLAMExpressionFrame(): any {
+    const currentTime = performance.now() / 1000;
+    const elapsed = currentTime - this.lamStartTime;
+    
+    if (elapsed > this.lamDuration) {
+      // LAM expressions finished
+      this.useLAMExpressions = false;
+      return this.getArkitFaceFrame(); // Fall back to default
+    }
+    
+    // Calculate which LAM expression frame to use
+    const frameRate = this.lamExpressions.length / this.lamDuration;
+    const frameIndex = Math.floor(elapsed * frameRate);
+    
+    if (frameIndex >= 0 && frameIndex < this.lamExpressions.length) {
+      const lamFrame = this.lamExpressions[frameIndex];
+      
+      // Convert LAM expression format to ARKit format
+      this.expressitionData = this.convertLAMToARKit(lamFrame);
+      
+      // Log occasionally
+      if (frameIndex % 10 === 0) {
+        console.log('Using LAM expression frame:', frameIndex, '/', this.lamExpressions.length, 'elapsed:', elapsed.toFixed(2));
+      }
+      
+      return this.expressitionData;
+    }
+    
+    // Fallback to default if frame index is out of range
+    return this.getArkitFaceFrame();
+  }
+
+  private convertLAMToARKit(lamFrame: any): any {
+    // Convert LAM expression data to ARKit blendshape format
+    // This is a simplified conversion - in reality you'd need proper mapping
+    const arkitData: any = {};
+    
+    if (Array.isArray(lamFrame) && lamFrame.length >= 52) {
+      // Assuming LAM expressions are in ARKit order already
+      // Map to ARKit blendshape names
+      const arkitNames = [
+        'eyeBlinkLeft', 'eyeLookDownLeft', 'eyeLookInLeft', 'eyeLookOutLeft', 'eyeLookUpLeft',
+        'eyeSquintLeft', 'eyeWideLeft', 'eyeBlinkRight', 'eyeLookDownRight', 'eyeLookInRight',
+        'eyeLookOutRight', 'eyeLookUpRight', 'eyeSquintRight', 'eyeWideRight', 'jawForward',
+        'jawLeft', 'jawRight', 'jawOpen', 'mouthClose', 'mouthFunnel', 'mouthPucker',
+        'mouthLeft', 'mouthRight', 'mouthSmileLeft', 'mouthSmileRight', 'mouthFrownLeft',
+        'mouthFrownRight', 'mouthDimpleLeft', 'mouthDimpleRight', 'mouthStretchLeft',
+        'mouthStretchRight', 'mouthRollLower', 'mouthRollUpper', 'mouthShrugLower',
+        'mouthShrugUpper', 'mouthPressLeft', 'mouthPressRight', 'mouthLowerDownLeft',
+        'mouthLowerDownRight', 'mouthUpperUpLeft', 'mouthUpperUpRight', 'browDownLeft',
+        'browDownRight', 'browInnerUp', 'browOuterUpLeft', 'browOuterUpRight',
+        'cheekPuff', 'cheekSquintLeft', 'cheekSquintRight', 'noseSneerLeft', 'noseSneerRight', 'tongueOut'
+      ];
+      
+      // Map LAM values to ARKit names
+      for (let i = 0; i < Math.min(lamFrame.length, arkitNames.length); i++) {
+        arkitData[arkitNames[i]] = lamFrame[i];
+      }
+    } else if (typeof lamFrame === 'object') {
+      // If LAM frame is already an object, use it directly
+      Object.assign(arkitData, lamFrame);
+    }
+    
+    return arkitData;
   }
 }
