@@ -1,5 +1,5 @@
 {
-    "name": "LAM_WebRender",
+    "name": "LAM_WebRender_ChatApp",
     "private": true,
     "version": "0.0.0",
     "type": "module",
@@ -11,10 +11,15 @@
     "devDependencies": {
       "vite": "^5.1.6",
       "vue-tsc": "^2.1.4",
-      "@vitejs/plugin-vue": "^5.1.3"
+      "@vitejs/plugin-vue": "^5.1.3",
+      "typescript": "^5.0.0"
     },
     "dependencies": {
-        "gaussian-splat-renderer-for-lam":"0.0.8"
+        "gaussian-splat-renderer-for-lam":"0.0.8",
+        "vue": "^3.4.0",
+        "@heroicons/vue": "^2.0.18",
+        "uuid": "^9.0.1",
+        "@types/uuid": "^9.0.7"
     },
     "repository": "https://github.com/aigc3d/LAM_WebRender"
   }
