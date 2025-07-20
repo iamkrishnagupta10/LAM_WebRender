@@ -1,6 +1,5 @@
 // Vercel Serverless Function for AI Conversation Pipeline
 import OpenAI from 'openai';
-import { Blob } from 'buffer';
 
 // Simple VAD using energy-based detection
 function detectSpeechActivity(audioArray, sampleRate = 16000) {
@@ -133,14 +132,20 @@ export default async function handler(req, res) {
     });
     
     // Decode base64 audio
-    const audioBuffer = Buffer.from(audio_data, 'base64');
-    const audioArray = new Float32Array(audioBuffer.buffer);
-    
-    console.log('🎵 Audio processed:', {
-      bufferSize: audioBuffer.length,
-      arrayLength: audioArray.length,
-      maxAmplitude: Math.max(...audioArray.map(Math.abs))
-    });
+    let audioBuffer, audioArray;
+    try {
+      audioBuffer = Buffer.from(audio_data, 'base64');
+      audioArray = new Float32Array(audioBuffer.buffer);
+      
+      console.log('🎵 Audio processed:', {
+        bufferSize: audioBuffer.length,
+        arrayLength: audioArray.length,
+        maxAmplitude: Math.max(...audioArray.map(Math.abs))
+      });
+    } catch (decodeError) {
+      console.error('❌ Audio decode error:', decodeError);
+      return res.status(400).json({ error: 'Invalid audio data format' });
+    }
     
     // Step 1: VAD - Voice Activity Detection
     const speechSegments = detectSpeechActivity(audioArray, sample_rate);
@@ -162,40 +167,40 @@ export default async function handler(req, res) {
     
     console.log('🗣️ Using speech segment:', { start, end, duration: (end - start) / sample_rate });
     
-    // Convert to WAV buffer for Whisper (proper format)
-    const speechLength = speechAudio.length;
-    const wavBuffer = Buffer.alloc(speechLength * 2 + 44);
-    
-    // WAV header
-    wavBuffer.write('RIFF', 0);
-    wavBuffer.writeUInt32LE(wavBuffer.length - 8, 4);
-    wavBuffer.write('WAVE', 8);
-    wavBuffer.write('fmt ', 12);
-    wavBuffer.writeUInt32LE(16, 16);
-    wavBuffer.writeUInt16LE(1, 20);
-    wavBuffer.writeUInt16LE(1, 22);
-    wavBuffer.writeUInt32LE(sample_rate, 24);
-    wavBuffer.writeUInt32LE(sample_rate * 2, 28);
-    wavBuffer.writeUInt16LE(2, 32);
-    wavBuffer.writeUInt16LE(16, 34);
-    wavBuffer.write('data', 36);
-    wavBuffer.writeUInt32LE(speechLength * 2, 40);
-    
-    // Convert float32 to int16
-    for (let i = 0; i < speechLength; i++) {
-      const sample = Math.max(-1, Math.min(1, speechAudio[i]));
-      wavBuffer.writeInt16LE(sample * 32767, 44 + i * 2);
-    }
-    
-    console.log('🎵 WAV buffer created:', wavBuffer.length, 'bytes');
-    
-    // Step 2: ASR - Whisper Transcription
+    // Step 2: ASR - Whisper Transcription (FIXED)
     try {
-      // Create a Blob instead of File for better compatibility
-      const audioBlob = new Blob([wavBuffer], { type: 'audio/wav' });
+      // Create WAV file buffer for Whisper
+      const speechLength = speechAudio.length;
+      const wavBuffer = Buffer.alloc(speechLength * 2 + 44);
+      
+      // WAV header
+      wavBuffer.write('RIFF', 0);
+      wavBuffer.writeUInt32LE(wavBuffer.length - 8, 4);
+      wavBuffer.write('WAVE', 8);
+      wavBuffer.write('fmt ', 12);
+      wavBuffer.writeUInt32LE(16, 16);
+      wavBuffer.writeUInt16LE(1, 20);
+      wavBuffer.writeUInt16LE(1, 22);
+      wavBuffer.writeUInt32LE(sample_rate, 24);
+      wavBuffer.writeUInt32LE(sample_rate * 2, 28);
+      wavBuffer.writeUInt16LE(2, 32);
+      wavBuffer.writeUInt16LE(16, 34);
+      wavBuffer.write('data', 36);
+      wavBuffer.writeUInt32LE(speechLength * 2, 40);
+      
+      // Convert float32 to int16
+      for (let i = 0; i < speechLength; i++) {
+        const sample = Math.max(-1, Math.min(1, speechAudio[i]));
+        wavBuffer.writeInt16LE(sample * 32767, 44 + i * 2);
+      }
+      
+      console.log('🎵 WAV buffer created:', wavBuffer.length, 'bytes');
+      
+      // Create File object for Whisper API (FIXED FOR SERVERLESS)
+      const audioFile = new File([wavBuffer], 'audio.wav', { type: 'audio/wav' });
       
       const transcriptionResponse = await openai.audio.transcriptions.create({
-        file: audioBlob,
+        file: audioFile,
         model: 'whisper-1',
         language: 'en'
       });
@@ -291,38 +296,12 @@ export default async function handler(req, res) {
     } catch (whisperError) {
       console.error('❌ Whisper transcription error:', whisperError);
       
-      // Fallback: return a default response to test TTS and expressions
-      const fallbackResponse = "I heard you speaking, but I'm having trouble understanding. Could you try speaking a bit louder or clearer?";
-      
-      const ttsResponse = await openai.audio.speech.create({
-        model: 'tts-1',
-        voice: 'alloy',
-        input: fallbackResponse,
-        response_format: 'wav'
-      });
-      
-      const ttsBuffer = Buffer.from(await ttsResponse.arrayBuffer());
-      const ttsAudioData = ttsBuffer.slice(44);
-      const ttsAudioArray = new Float32Array(ttsAudioData.length / 2);
-      
-      for (let i = 0; i < ttsAudioArray.length; i++) {
-        const sample = ttsAudioData.readInt16LE(i * 2);
-        ttsAudioArray[i] = sample / 32767;
-      }
-      
-      const audioDuration = ttsAudioArray.length / sample_rate;
-      const lamExpressions = generateSimpleLAMExpressions(fallbackResponse, audioDuration);
-      const responseAudioBase64 = Buffer.from(ttsAudioArray.buffer).toString('base64');
-      
-      return res.status(200).json({
-        success: true,
-        user_text: '[unclear speech]',
-        ai_response: fallbackResponse,
-        response_audio: responseAudioBase64,
-        response_sample_rate: sample_rate,
-        audio_duration: audioDuration,
-        lam_expressions: lamExpressions,
-        fallback: true
+      // Return detailed error for debugging
+      return res.status(500).json({
+        success: false,
+        error: 'Speech transcription failed',
+        details: whisperError.message,
+        stage: 'whisper_transcription'
       });
     }
     
@@ -331,7 +310,8 @@ export default async function handler(req, res) {
     return res.status(500).json({
       success: false,
       error: error.message,
-      stack: error.stack
+      stack: error.stack,
+      stage: 'general_error'
     });
   }
 }
