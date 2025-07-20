@@ -1,6 +1,6 @@
 import { GaussianAvatar } from './gaussianAvatar';
 
-console.log('Starting LAM WebRender with REAL AI Conversation...');
+console.log('Starting LAM WebRender with Auto AI Conversation...');
 
 const div = document.getElementById('LAM_WebRender') as HTMLDivElement;
 const assetPath = '/asset/arkit/p2-1.zip';
@@ -14,9 +14,12 @@ let mediaRecorder: MediaRecorder | null = null;
 let audioChunks: Blob[] = [];
 let audioContext: AudioContext | null = null;
 let sessionId: string = 'session_' + Date.now();
+let conversationActive = false;
 
-// Real AI server URL
-const AI_SERVER_URL = 'http://localhost:5002';
+// Production AI server URL (will be deployed to Vercel/GCP)
+const AI_SERVER_URL = process.env.NODE_ENV === 'production' 
+  ? '/api/ai'  // Vercel serverless function
+  : 'http://localhost:5002';
 
 function hideLoadingIndicator() {
   const indicator = document.getElementById('loadingIndicator');
@@ -26,159 +29,108 @@ function hideLoadingIndicator() {
   }
 }
 
-function addAudioControls() {
-  // Add real AI conversation controls
-  const controlsHtml = `
-    <div id="audioControls" style="
+function addMinimalUI() {
+  // Minimal UI showing avatar status only
+  const uiHtml = `
+    <div id="avatarStatus" style="
       position: fixed;
-      bottom: 20px;
+      top: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 10px 15px;
+      border-radius: 20px;
+      color: white;
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      z-index: 1000;
+      backdrop-filter: blur(10px);
+    ">
+      <div id="statusText">🤖 Initializing AI Avatar...</div>
+      <div id="aiPipelineStatus" style="font-size: 10px; margin-top: 3px; opacity: 0.8;">
+        Connecting to AI services...
+      </div>
+    </div>
+    
+    <div id="conversationHint" style="
+      position: fixed;
+      bottom: 30px;
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(0, 0, 0, 0.8);
-      padding: 15px;
-      border-radius: 10px;
-      color: white;
-      text-align: center;
+      background: rgba(255, 255, 255, 0.9);
+      color: #333;
+      padding: 15px 25px;
+      border-radius: 25px;
       font-family: Arial, sans-serif;
+      font-size: 14px;
       z-index: 1000;
-      max-width: 500px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      text-align: center;
+      display: none;
     ">
-      <div style="margin-bottom: 10px;">🧠 REAL AI CONVERSATION</div>
-      <div style="font-size: 10px; margin-bottom: 8px;">VAD → Whisper ASR → GPT → OpenAI TTS → LAM_Audio2Expression</div>
-      
-      <button id="micButton" style="
-        background: #4CAF50;
-        border: none;
-        color: white;
-        padding: 10px 20px;
-        margin: 5px;
-        border-radius: 5px;
-        cursor: pointer;
-        font-weight: bold;
-      ">🎤 Talk to AI</button>
-      
-      <button id="textButton" style="
-        background: #2196F3;
-        border: none;
-        color: white;
-        padding: 10px 20px;
-        margin: 5px;
-        border-radius: 5px;
-        cursor: pointer;
-      ">💬 Text Chat</button>
-      
-      <button id="resetButton" style="
-        background: #ff9800;
-        border: none;
-        color: white;
-        padding: 10px 20px;
-        margin: 5px;
-        border-radius: 5px;
-        cursor: pointer;
-      ">🔄 Reset</button>
-      
-      <div>
-        <input id="textInput" type="text" placeholder="Type your message..." style="
-          width: 300px;
-          padding: 8px;
-          margin: 5px;
-          border: none;
-          border-radius: 5px;
-          display: none;
-        ">
-      </div>
-      
-      <div id="statusText" style="margin-top: 10px; font-size: 12px;">
-        Click "Talk to AI" for real voice conversation!
-      </div>
-      
-      <div id="aiStatus" style="margin-top: 5px; font-size: 10px; color: #ccc;">
-        Checking AI server...
-      </div>
-      
-      <div id="conversationLog" style="
-        margin-top: 10px;
-        max-height: 100px;
-        overflow-y: auto;
-        text-align: left;
-        font-size: 11px;
-        background: rgba(255,255,255,0.1);
-        padding: 5px;
-        border-radius: 3px;
-        display: none;
-      "></div>
+      <div style="font-weight: bold; margin-bottom: 5px;">👋 Hi! I'm your AI Avatar</div>
+      <div style="font-size: 12px;">Just start talking to me - I'm listening!</div>
     </div>
   `;
   
-  document.body.insertAdjacentHTML('beforeend', controlsHtml);
-  
-  // Add event listeners
-  document.getElementById('micButton')?.addEventListener('click', toggleRecording);
-  document.getElementById('textButton')?.addEventListener('click', toggleTextInput);
-  document.getElementById('resetButton')?.addEventListener('click', resetConversation);
-  
-  // Text input handler
-  const textInput = document.getElementById('textInput') as HTMLInputElement;
-  textInput?.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-      sendTextMessage();
-    }
-  });
-  
-  // Check AI server status
-  checkAIServerStatus();
+  document.body.insertAdjacentHTML('beforeend', uiHtml);
 }
 
 async function checkAIServerStatus() {
   try {
-    const response = await fetch(`${AI_SERVER_URL}/`);
+    const response = await fetch(`${AI_SERVER_URL}/health`);
     const data = await response.json();
     
-    const aiStatus = document.getElementById('aiStatus');
-    if (aiStatus) {
+    const statusElement = document.getElementById('aiPipelineStatus');
+    if (statusElement && data.components) {
       const components = data.components;
-      const allReady = components.whisper_asr && components.openai_llm && components.lam_avatar;
+      const readyComponents = [];
       
-      if (allReady) {
-        aiStatus.innerHTML = '✅ Full AI Pipeline Ready<br>🎤ASR 🧠LLM 🔊TTS 🎭LAM';
-        aiStatus.style.color = '#4CAF50';
+      if (components.whisper_asr) readyComponents.push('🎤 ASR');
+      if (components.openai_llm) readyComponents.push('🧠 LLM');
+      if (components.openai_tts) readyComponents.push('🔊 TTS');
+      if (components.lam_avatar) readyComponents.push('🎭 LAM');
+      
+      if (readyComponents.length === 4) {
+        statusElement.textContent = '✅ Full AI Pipeline Ready';
+        statusElement.style.color = '#4CAF50';
+        return true;
       } else {
-        const status = [];
-        if (components.whisper_asr) status.push('🎤ASR');
-        if (components.openai_llm) status.push('🧠LLM+TTS');
-        if (components.lam_avatar) status.push('🎭LAM');
-        
-        aiStatus.innerHTML = `⚠️ Partial Ready: ${status.join(' ')}`;
-        aiStatus.style.color = '#ff9800';
+        statusElement.textContent = `⚠️ ${readyComponents.join(' ')} (${readyComponents.length}/4)`;
+        statusElement.style.color = '#ff9800';
+        return false;
       }
     }
+    return false;
   } catch (error) {
-    console.error('AI server not available:', error);
-    const aiStatus = document.getElementById('aiStatus');
-    if (aiStatus) {
-      aiStatus.textContent = '❌ AI Server Offline';
-      aiStatus.style.color = '#f44336';
+    console.error('AI server check failed:', error);
+    const statusElement = document.getElementById('aiPipelineStatus');
+    if (statusElement) {
+      statusElement.textContent = '❌ AI Service Offline';
+      statusElement.style.color = '#f44336';
     }
+    return false;
   }
 }
 
-async function initializeAudio() {
+async function initializeAutoConversation() {
   try {
     // Initialize Web Audio API
     audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
     console.log('Audio context initialized');
     
-    // Request microphone permission
+    // Request microphone permission immediately
     const stream = await navigator.mediaDevices.getUserMedia({ 
       audio: {
         sampleRate: 16000,
         channelCount: 1,
         echoCancellation: true,
-        noiseSuppression: true
+        noiseSuppression: true,
+        autoGainControl: true
       }
     });
     
-    // Create MediaRecorder for real audio recording
+    // Create MediaRecorder for continuous audio monitoring
     mediaRecorder = new MediaRecorder(stream, {
       mimeType: 'audio/webm;codecs=opus'
     });
@@ -190,127 +142,85 @@ async function initializeAudio() {
     };
     
     mediaRecorder.onstop = () => {
-      processRecordedAudio();
+      if (audioChunks.length > 0) {
+        processRecordedAudio();
+      }
     };
     
-    console.log('Real audio recording ready!');
+    updateStatus('🎤 Microphone Ready - Listening...');
+    
+    // Start continuous listening
+    startContinuousListening();
+    
+    console.log('Auto conversation system ready!');
     
   } catch (error) {
-    console.error('Error initializing audio:', error);
-    updateStatus('Microphone not available - text only');
+    console.error('Error initializing auto conversation:', error);
+    updateStatus('❌ Microphone access denied');
+    
+    // Fallback: show click-to-enable message
+    showMicrophonePrompt();
   }
 }
 
-function toggleRecording() {
-  if (!mediaRecorder) {
-    updateStatus('Audio recording not available');
-    return;
-  }
+function startContinuousListening() {
+  if (!mediaRecorder) return;
   
-  if (isListening) {
-    // Stop recording
-    mediaRecorder.stop();
-    isListening = false;
-    updateMicButton();
-    updateStatus('Processing your speech...');
-    
-    if (avatarInstance) {
-      avatarInstance.setState('Thinking');
+  updateStatus('👂 Listening for your voice...');
+  showConversationHint();
+  
+  // Start recording in chunks for voice activity detection
+  const recordChunk = () => {
+    if (!conversationActive && mediaRecorder && mediaRecorder.state === 'inactive') {
+      audioChunks = [];
+      mediaRecorder.start();
+      
+      // Record for 3 seconds, then process
+      setTimeout(() => {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+          mediaRecorder.stop();
+        }
+        
+        // Continue listening after a short delay
+        setTimeout(recordChunk, 500);
+      }, 3000);
     }
-  } else {
-    // Start recording
-    audioChunks = [];
-    mediaRecorder.start();
-    isListening = true;
-    updateMicButton();
-    updateStatus('🎤 Listening... speak now!');
+  };
+  
+  recordChunk();
+}
+
+function showConversationHint() {
+  const hint = document.getElementById('conversationHint');
+  if (hint) {
+    hint.style.display = 'block';
     
-    if (avatarInstance) {
-      avatarInstance.setState('Listening');
-    }
+    // Hide hint after 10 seconds
+    setTimeout(() => {
+      hint.style.display = 'none';
+    }, 10000);
   }
 }
 
-function updateMicButton() {
-  const button = document.getElementById('micButton') as HTMLButtonElement;
-  if (button) {
-    if (isListening) {
-      button.textContent = '⏹️ Stop Recording';
-      button.style.background = '#f44336';
-    } else {
-      button.textContent = '🎤 Talk to AI';
-      button.style.background = '#4CAF50';
-    }
-  }
-}
-
-function toggleTextInput() {
-  const textInput = document.getElementById('textInput') as HTMLInputElement;
-  const button = document.getElementById('textButton') as HTMLButtonElement;
-  
-  if (textInput.style.display === 'none') {
-    textInput.style.display = 'inline-block';
-    textInput.focus();
-    button.textContent = '🗣️ Voice Mode';
-  } else {
-    textInput.style.display = 'none';
-    button.textContent = '💬 Text Chat';
-  }
-}
-
-async function sendTextMessage() {
-  const textInput = document.getElementById('textInput') as HTMLInputElement;
-  const text = textInput.value.trim();
-  
-  if (!text) return;
-  
-  textInput.value = '';
-  updateStatus(`You: "${text}"`);
-  logConversation('You', text);
-  
-  if (avatarInstance) {
-    avatarInstance.setState('Thinking');
-  }
-  
-  try {
-    const response = await fetch(`${AI_SERVER_URL}/api/text_conversation`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        text: text,
-        session_id: sessionId
-      })
-    });
+function showMicrophonePrompt() {
+  const hint = document.getElementById('conversationHint');
+  if (hint) {
+    hint.innerHTML = `
+      <div style="font-weight: bold; margin-bottom: 5px;">🎤 Microphone Access Needed</div>
+      <div style="font-size: 12px;">Click anywhere to enable voice conversation</div>
+    `;
+    hint.style.display = 'block';
     
-    if (!response.ok) {
-      throw new Error(`Server error: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    
-    if (data.success) {
-      handleAIResponse(data);
-    } else {
-      throw new Error(data.message || 'AI conversation failed');
-    }
-    
-  } catch (error) {
-    console.error('Text conversation error:', error);
-    updateStatus('AI conversation failed');
-    if (avatarInstance) {
-      avatarInstance.setState('Idle');
-    }
+    // Add click listener to try again
+    document.addEventListener('click', async () => {
+      hint.style.display = 'none';
+      await initializeAutoConversation();
+    }, { once: true });
   }
 }
 
 async function processRecordedAudio() {
-  if (audioChunks.length === 0) {
-    updateStatus('No audio recorded');
-    if (avatarInstance) {
-      avatarInstance.setState('Idle');
-    }
+  if (audioChunks.length === 0 || conversationActive) {
     return;
   }
   
@@ -318,20 +228,42 @@ async function processRecordedAudio() {
     // Create blob from recorded chunks
     const audioBlob = new Blob(audioChunks, { type: 'audio/webm;codecs=opus' });
     
+    // Quick check if audio has meaningful content
+    if (audioBlob.size < 10000) { // Less than 10KB probably silence
+      return;
+    }
+    
+    conversationActive = true;
+    updateStatus('🎯 Processing your voice...');
+    
+    if (avatarInstance) {
+      avatarInstance.setState('Listening');
+    }
+    
     // Convert to audio array
     const arrayBuffer = await audioBlob.arrayBuffer();
     const audioBuffer = await audioContext!.decodeAudioData(arrayBuffer);
     
-    // Convert to float32 array
+    // Check for actual speech content
     const audioArray = audioBuffer.getChannelData(0);
+    const rms = Math.sqrt(audioArray.reduce((sum, val) => sum + val * val, 0) / audioArray.length);
+    
+    if (rms < 0.01) { // Too quiet, probably no speech
+      conversationActive = false;
+      updateStatus('👂 Listening for your voice...');
+      return;
+    }
     
     // Encode to base64
     const audioBase64 = base64EncodeArray(audioArray);
     
-    updateStatus('Sending audio to AI...');
+    updateStatus('🧠 AI is thinking...');
+    if (avatarInstance) {
+      avatarInstance.setState('Thinking');
+    }
     
-    // Send to real AI conversation pipeline
-    const response = await fetch(`${AI_SERVER_URL}/api/real_conversation`, {
+    // Send to AI conversation pipeline
+    const response = await fetch(`${AI_SERVER_URL}/conversation`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -349,38 +281,36 @@ async function processRecordedAudio() {
     
     const data = await response.json();
     
-    if (data.success) {
-      // Log what user said
-      logConversation('You', data.user_text);
-      updateStatus(`You said: "${data.user_text}"`);
-      
-      // Handle AI response
-      handleAIResponse(data);
+    if (data.success && data.user_text && data.user_text.trim().length > 3) {
+      // Valid speech detected and transcribed
+      updateStatus(`💬 "${data.user_text}"`);
+      await handleAIResponse(data);
     } else {
-      throw new Error(data.message || 'AI conversation failed');
+      // No meaningful speech detected
+      conversationActive = false;
+      updateStatus('👂 Listening for your voice...');
     }
     
   } catch (error) {
-    console.error('Real conversation error:', error);
-    updateStatus('AI conversation failed');
+    console.error('Audio processing error:', error);
+    conversationActive = false;
+    updateStatus('👂 Ready to listen...');
     if (avatarInstance) {
       avatarInstance.setState('Idle');
     }
   }
 }
 
-function handleAIResponse(data: any) {
-  console.log('AI Response Data:', data);
+async function handleAIResponse(data: any) {
+  console.log('AI Response:', data.ai_response);
   
-  // Log AI response
-  logConversation('AI', data.ai_response);
-  updateStatus(`AI: "${data.ai_response}"`);
+  updateStatus(`🤖 "${data.ai_response}"`);
   
   if (avatarInstance) {
     avatarInstance.setState('Responding');
   }
   
-  // Apply LAM expressions if available
+  // Apply LAM expressions
   if (data.lam_expressions && data.lam_expressions.length > 0) {
     console.log('Applying LAM expressions:', data.lam_expressions.length, 'frames');
     if (avatarInstance) {
@@ -388,70 +318,50 @@ function handleAIResponse(data: any) {
     }
   }
   
-  // Play the AI's voice
+  // Play AI audio response
   if (data.response_audio) {
-    playAIAudio(data.response_audio, data.response_sample_rate);
-  } else {
-    // Fallback to default animation
-    setTimeout(() => {
-      if (avatarInstance) {
-        avatarInstance.setState('Idle');
-      }
-      updateStatus('Ready for next conversation...');
-    }, 2000);
+    await playAIAudio(data.response_audio, data.response_sample_rate);
   }
-}
-
-function playAIAudio(audioBase64: string, sampleRate: number) {
-  try {
-    // Decode base64 audio
-    const audioBytes = base64DecodeToArray(audioBase64);
-    
-    // Create audio buffer
-    const audioBuffer = audioContext!.createBuffer(1, audioBytes.length, sampleRate);
-    audioBuffer.copyToChannel(audioBytes, 0);
-    
-    // Create audio source
-    const source = audioContext!.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(audioContext!.destination);
-    
-    source.onended = () => {
-      console.log('AI audio playback finished');
-      if (avatarInstance) {
-        avatarInstance.setState('Idle');
-      }
-      updateStatus('Ready for next conversation...');
-    };
-    
-    // Play audio
-    source.start();
-    console.log('Playing AI audio response');
-    
-  } catch (error) {
-    console.error('Error playing AI audio:', error);
+  
+  // Resume listening after response
+  setTimeout(() => {
+    conversationActive = false;
+    updateStatus('👂 Listening for your voice...');
     if (avatarInstance) {
       avatarInstance.setState('Idle');
     }
-    updateStatus('Ready for next conversation...');
-  }
+  }, 1000);
 }
 
-function logConversation(speaker: string, message: string) {
-  const log = document.getElementById('conversationLog');
-  if (log) {
-    log.style.display = 'block';
-    const entry = document.createElement('div');
-    entry.style.marginBottom = '3px';
-    entry.innerHTML = `<strong>${speaker}:</strong> ${message}`;
-    log.appendChild(entry);
-    log.scrollTop = log.scrollHeight;
-    
-    // Keep only last 10 entries
-    while (log.children.length > 10) {
-      log.removeChild(log.firstChild!);
+function playAIAudio(audioBase64: string, sampleRate: number): Promise<void> {
+  return new Promise((resolve) => {
+    try {
+      // Decode base64 audio
+      const audioBytes = base64DecodeToArray(audioBase64);
+      
+      // Create audio buffer
+      const audioBuffer = audioContext!.createBuffer(1, audioBytes.length, sampleRate);
+      audioBuffer.copyToChannel(audioBytes, 0);
+      
+      // Create audio source
+      const source = audioContext!.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContext!.destination);
+      
+      source.onended = () => {
+        console.log('AI audio playback finished');
+        resolve();
+      };
+      
+      // Play audio
+      source.start();
+      console.log('Playing AI response audio');
+      
+    } catch (error) {
+      console.error('Error playing AI audio:', error);
+      resolve();
     }
-  }
+  });
 }
 
 function updateStatus(message: string) {
@@ -460,36 +370,6 @@ function updateStatus(message: string) {
     statusElement.textContent = message;
   }
   console.log('Status:', message);
-}
-
-async function resetConversation() {
-  try {
-    const response = await fetch(`${AI_SERVER_URL}/api/reset_conversation`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        session_id: sessionId
-      })
-    });
-    
-    const data = await response.json();
-    updateStatus('Conversation reset');
-    
-    // Clear conversation log
-    const log = document.getElementById('conversationLog');
-    if (log) {
-      log.innerHTML = '';
-      log.style.display = 'none';
-    }
-    
-    console.log('Conversation reset:', data);
-    
-  } catch (error) {
-    console.error('Error resetting conversation:', error);
-    updateStatus('Failed to reset conversation');
-  }
 }
 
 // Utility functions for base64 encoding/decoding of float32 arrays
@@ -515,13 +395,28 @@ if (div) {
     avatarInstance.start();
     console.log('Avatar started successfully!');
     
-    // Initialize real audio capabilities
-    initializeAudio();
+    // Add minimal UI
+    addMinimalUI();
     
-    // Add controls after a short delay
-    setTimeout(() => {
+    // Wait for avatar to load, then start conversation system
+    setTimeout(async () => {
       hideLoadingIndicator();
-      addAudioControls();
+      
+      // Check AI services
+      const aiReady = await checkAIServerStatus();
+      
+      if (aiReady) {
+        await initializeAutoConversation();
+      } else {
+        updateStatus('⚠️ AI services starting up...');
+        // Retry in 5 seconds
+        setTimeout(async () => {
+          const retryReady = await checkAIServerStatus();
+          if (retryReady) {
+            await initializeAutoConversation();
+          }
+        }, 5000);
+      }
     }, 3000);
     
   } catch (error) {
