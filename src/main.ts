@@ -49,6 +49,17 @@ function addMinimalUI() {
       <div id="aiPipelineStatus" style="font-size: 10px; margin-top: 3px; opacity: 0.8;">
         Connecting to AI services...
       </div>
+      <button id="debugTestButton" style="
+        background: #ff9800;
+        border: none;
+        color: white;
+        padding: 5px 10px;
+        margin-top: 8px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 10px;
+        display: none;
+      ">🧪 Test AI</button>
     </div>
     
     <div id="conversationHint" style="
@@ -71,17 +82,104 @@ function addMinimalUI() {
       <div style="font-weight: bold; margin-bottom: 5px;">👋 Hi! I'm your AI Avatar</div>
       <div style="font-size: 12px;">Just start talking to me - I'm listening!</div>
     </div>
+    
+    <div id="debugLog" style="
+      position: fixed;
+      top: 120px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.8);
+      color: #00ff00;
+      padding: 10px;
+      border-radius: 10px;
+      font-family: monospace;
+      font-size: 10px;
+      max-width: 300px;
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 999;
+      display: none;
+    ">
+      <div>🔍 Debug Log:</div>
+      <div id="debugContent"></div>
+    </div>
   `;
   
   document.body.insertAdjacentHTML('beforeend', uiHtml);
+  
+  // Add test button handler
+  document.getElementById('debugTestButton')?.addEventListener('click', testAIDirectly);
+}
+
+function debugLog(message: string) {
+  console.log(message);
+  const debugContent = document.getElementById('debugContent');
+  if (debugContent) {
+    const debugDiv = document.getElementById('debugLog');
+    if (debugDiv) {
+      debugDiv.style.display = 'block';
+    }
+    
+    const timestamp = new Date().toLocaleTimeString();
+    debugContent.innerHTML += `<div>${timestamp}: ${message}</div>`;
+    debugContent.scrollTop = debugContent.scrollHeight;
+    
+    // Keep only last 20 entries
+    while (debugContent.children.length > 20) {
+      debugContent.removeChild(debugContent.firstChild!);
+    }
+  }
+}
+
+async function testAIDirectly() {
+  debugLog('🧪 Testing AI directly...');
+  updateStatus('🧪 Testing AI...');
+  
+  try {
+    const response = await fetch(`${AI_SERVER_URL}/test`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: "Hello! This is a direct test of the AI system. Can you hear me?"
+      })
+    });
+    
+    debugLog(`📡 Test response status: ${response.status}`);
+    
+    if (!response.ok) {
+      throw new Error(`Test failed: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    debugLog('✅ Test response received');
+    
+    if (data.success) {
+      updateStatus('🔊 AI test successful - playing audio');
+      await handleAIResponse(data);
+      debugLog('🎵 Test audio played successfully');
+    } else {
+      throw new Error(data.error || 'Test failed');
+    }
+    
+  } catch (error) {
+    debugLog(`❌ Test failed: ${error}`);
+    updateStatus('❌ AI test failed');
+    console.error('AI test error:', error);
+  }
 }
 
 async function checkAIServerStatus() {
   try {
+    debugLog('🔍 Checking AI server...');
     const response = await fetch(`${AI_SERVER_URL}/health`);
     const data = await response.json();
     
+    debugLog(`📊 Health check: ${JSON.stringify(data.components)}`);
+    
     const statusElement = document.getElementById('aiPipelineStatus');
+    const testButton = document.getElementById('debugTestButton');
+    
     if (statusElement && data.components) {
       const components = data.components;
       const readyComponents = [];
@@ -94,15 +192,24 @@ async function checkAIServerStatus() {
       if (readyComponents.length === 4) {
         statusElement.textContent = '✅ Full AI Pipeline Ready';
         statusElement.style.color = '#4CAF50';
+        if (testButton) {
+          testButton.style.display = 'block';
+        }
+        debugLog('✅ All AI components ready');
         return true;
       } else {
         statusElement.textContent = `⚠️ ${readyComponents.join(' ')} (${readyComponents.length}/4)`;
         statusElement.style.color = '#ff9800';
+        if (testButton) {
+          testButton.style.display = 'block';
+        }
+        debugLog(`⚠️ Partial AI ready: ${readyComponents.join(', ')}`);
         return false;
       }
     }
     return false;
   } catch (error) {
+    debugLog(`❌ Health check failed: ${error}`);
     console.error('AI server check failed:', error);
     const statusElement = document.getElementById('aiPipelineStatus');
     if (statusElement) {
@@ -115,6 +222,8 @@ async function checkAIServerStatus() {
 
 async function initializeAutoConversation() {
   try {
+    debugLog('🎤 Initializing microphone...');
+    
     // Initialize Web Audio API
     audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
     console.log('Audio context initialized');
@@ -129,6 +238,8 @@ async function initializeAutoConversation() {
         autoGainControl: true
       }
     });
+    
+    debugLog('✅ Microphone access granted');
     
     // Create MediaRecorder for continuous audio monitoring
     mediaRecorder = new MediaRecorder(stream, {
@@ -152,9 +263,11 @@ async function initializeAutoConversation() {
     // Start continuous listening
     startContinuousListening();
     
+    debugLog('🔄 Auto conversation system ready');
     console.log('Auto conversation system ready!');
     
   } catch (error) {
+    debugLog(`❌ Microphone init failed: ${error}`);
     console.error('Error initializing auto conversation:', error);
     updateStatus('❌ Microphone access denied');
     
@@ -168,6 +281,8 @@ function startContinuousListening() {
   
   updateStatus('👂 Listening for your voice...');
   showConversationHint();
+  
+  debugLog('🔄 Starting continuous listening');
   
   // Start recording in chunks for voice activity detection
   const recordChunk = () => {
@@ -228,13 +343,17 @@ async function processRecordedAudio() {
     // Create blob from recorded chunks
     const audioBlob = new Blob(audioChunks, { type: 'audio/webm;codecs=opus' });
     
+    debugLog(`🎵 Audio blob: ${audioBlob.size} bytes`);
+    
     // Quick check if audio has meaningful content
     if (audioBlob.size < 10000) { // Less than 10KB probably silence
+      debugLog('🔇 Audio too small, skipping');
       return;
     }
     
     conversationActive = true;
     updateStatus('🎯 Processing your voice...');
+    debugLog('🎯 Starting audio processing');
     
     if (avatarInstance) {
       avatarInstance.setState('Listening');
@@ -248,9 +367,12 @@ async function processRecordedAudio() {
     const audioArray = audioBuffer.getChannelData(0);
     const rms = Math.sqrt(audioArray.reduce((sum, val) => sum + val * val, 0) / audioArray.length);
     
+    debugLog(`🔊 Audio RMS: ${rms.toFixed(4)}`);
+    
     if (rms < 0.01) { // Too quiet, probably no speech
       conversationActive = false;
       updateStatus('👂 Listening for your voice...');
+      debugLog('🔇 Audio too quiet, skipping');
       return;
     }
     
@@ -258,6 +380,8 @@ async function processRecordedAudio() {
     const audioBase64 = base64EncodeArray(audioArray);
     
     updateStatus('🧠 AI is thinking...');
+    debugLog('📡 Sending to AI server...');
+    
     if (avatarInstance) {
       avatarInstance.setState('Thinking');
     }
@@ -275,23 +399,29 @@ async function processRecordedAudio() {
       })
     });
     
+    debugLog(`📡 AI response status: ${response.status}`);
+    
     if (!response.ok) {
       throw new Error(`AI server error: ${response.status}`);
     }
     
     const data = await response.json();
+    debugLog(`📨 AI response: ${data.success ? 'SUCCESS' : 'FAILED'}`);
     
-    if (data.success && data.user_text && data.user_text.trim().length > 3) {
+    if (data.success && data.user_text && data.user_text.trim().length > 2) {
       // Valid speech detected and transcribed
+      debugLog(`🗣️ Transcribed: "${data.user_text}"`);
       updateStatus(`💬 "${data.user_text}"`);
       await handleAIResponse(data);
     } else {
       // No meaningful speech detected
       conversationActive = false;
       updateStatus('👂 Listening for your voice...');
+      debugLog('🔇 No meaningful speech detected');
     }
     
   } catch (error) {
+    debugLog(`❌ Audio processing error: ${error}`);
     console.error('Audio processing error:', error);
     conversationActive = false;
     updateStatus('👂 Ready to listen...');
@@ -303,6 +433,7 @@ async function processRecordedAudio() {
 
 async function handleAIResponse(data: any) {
   console.log('AI Response:', data.ai_response);
+  debugLog(`🤖 AI said: "${data.ai_response}"`);
   
   updateStatus(`🤖 "${data.ai_response}"`);
   
@@ -312,6 +443,7 @@ async function handleAIResponse(data: any) {
   
   // Apply LAM expressions
   if (data.lam_expressions && data.lam_expressions.length > 0) {
+    debugLog(`🎭 Applying ${data.lam_expressions.length} expression frames`);
     console.log('Applying LAM expressions:', data.lam_expressions.length, 'frames');
     if (avatarInstance) {
       avatarInstance.applyLAMExpressions(data.lam_expressions, data.audio_duration);
@@ -320,6 +452,7 @@ async function handleAIResponse(data: any) {
   
   // Play AI audio response
   if (data.response_audio) {
+    debugLog('🔊 Playing AI audio response');
     await playAIAudio(data.response_audio, data.response_sample_rate);
   }
   
@@ -327,6 +460,7 @@ async function handleAIResponse(data: any) {
   setTimeout(() => {
     conversationActive = false;
     updateStatus('👂 Listening for your voice...');
+    debugLog('👂 Resuming listening');
     if (avatarInstance) {
       avatarInstance.setState('Idle');
     }
@@ -349,6 +483,7 @@ function playAIAudio(audioBase64: string, sampleRate: number): Promise<void> {
       source.connect(audioContext!.destination);
       
       source.onended = () => {
+        debugLog('🔊 Audio playback finished');
         console.log('AI audio playback finished');
         resolve();
       };
@@ -358,6 +493,7 @@ function playAIAudio(audioBase64: string, sampleRate: number): Promise<void> {
       console.log('Playing AI response audio');
       
     } catch (error) {
+      debugLog(`❌ Audio playback error: ${error}`);
       console.error('Error playing AI audio:', error);
       resolve();
     }
